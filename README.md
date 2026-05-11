@@ -1,0 +1,1 @@
+Registo EV – ZIP de produção com Room, Compose, estatísticas base, splash e ícone.

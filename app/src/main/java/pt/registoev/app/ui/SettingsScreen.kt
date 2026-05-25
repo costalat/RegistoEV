@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -29,8 +30,17 @@ fun SettingsScreen() {
     var matricula by remember { 
         mutableStateOf(sharedPrefs.getString("vehicle_plate", "") ?: "") 
     }
+    var marca by remember { 
+        mutableStateOf(sharedPrefs.getString("vehicle_brand", "") ?: "") 
+    }
+    var modelo by remember { 
+        mutableStateOf(sharedPrefs.getString("vehicle_model", "") ?: "")
+    }
     var condutor by remember { 
         mutableStateOf(sharedPrefs.getString("driver_name", "") ?: "") 
+    }
+    var unidade by remember { 
+        mutableStateOf(sharedPrefs.getString("user_unit", "") ?: "")
     }
 
     Column(
@@ -49,7 +59,7 @@ fun SettingsScreen() {
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Card Identificação do Veículo
+        // Card Unidade
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
@@ -58,19 +68,19 @@ fun SettingsScreen() {
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Business, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("VEÍCULO", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Text("UNIDADE", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                 }
 
                 OutlinedTextField(
-                    value = matricula,
+                    value = unidade,
                     onValueChange = { 
-                        matricula = it
-                        sharedPrefs.edit { putString("vehicle_plate", it) }
+                        unidade = it
+                        sharedPrefs.edit { putString("user_unit", it) }
                     },
-                    label = { Text("Matrícula") },
-                    placeholder = { Text("00-AA-00") },
+                    label = { Text("Unidade / Estabelecimento / Órgão") },
+                    placeholder = { Text("Ex: Comando Territorial") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = settingsTextFieldColors(),
                     shape = RoundedCornerShape(12.dp),
@@ -105,6 +115,66 @@ fun SettingsScreen() {
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
                 )
+            }
+        }
+
+        // Card Identificação do Veículo
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+            shape = RoundedCornerShape(24.dp),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("VEÍCULO", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                }
+
+                OutlinedTextField(
+                    value = marca,
+                    onValueChange = { 
+                        marca = it
+                        sharedPrefs.edit { putString("vehicle_brand", it) }
+                    },
+                    label = { Text("Marca") },
+                    placeholder = { Text("Ex: Tesla") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = settingsTextFieldColors(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = modelo,
+                        onValueChange = { 
+                            modelo = it
+                            sharedPrefs.edit { putString("vehicle_model", it) }
+                        },
+                        label = { Text("Modelo") },
+                        placeholder = { Text("Ex: Model 3") },
+                        modifier = Modifier.weight(1f),
+                        colors = settingsTextFieldColors(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = matricula,
+                        onValueChange = { 
+                            matricula = it
+                            sharedPrefs.edit { putString("vehicle_plate", it) }
+                        },
+                        label = { Text("Matrícula") },
+                        placeholder = { Text("00-AA-00") },
+                        modifier = Modifier.weight(1f),
+                        colors = settingsTextFieldColors(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
             }
         }
 

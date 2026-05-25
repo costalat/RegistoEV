@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import pt.registoev.app.data.EvChargeEntity
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.*
 
 @Composable
 fun EditHistoryScreen(
@@ -37,10 +38,18 @@ fun EditHistoryScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     val sortedCharges = remember(charges) {
-        charges.sortedByDescending { it.odometer }
+        // Ordenar primeiro por Dia (descendente) e depois por Odómetro (descendente) para total consistência
+        charges.sortedWith(
+            compareByDescending<EvChargeEntity> { 
+                val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                cal.timeInMillis 
+            }.thenByDescending { it.odometer }
+        )
     }
 
     if (showDeleteConfirm) {

@@ -157,8 +157,12 @@ fun BackupScreen(
                     val start = dateRangePickerState.selectedStartDateMillis
                     if (start != null) {
                         val cal = Calendar.getInstance().apply { timeInMillis = start }
+                        val weekLabel = remember(start, dateRangePickerState.selectedEndDateMillis) {
+                            val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
+                            "Semana ${cal.get(Calendar.WEEK_OF_YEAR)} (${sdf.format(Date(start))} a ${sdf.format(Date(dateRangePickerState.selectedEndDateMillis ?: start))})"
+                        }
                         Text(
-                            text = "Semana ${cal.get(Calendar.WEEK_OF_YEAR)} (${SimpleDateFormat("dd/MM", Locale.getDefault()).format(Date(start))} a ${SimpleDateFormat("dd/MM", Locale.getDefault()).format(Date(dateRangePickerState.selectedEndDateMillis ?: start))})",
+                            text = weekLabel,
                             modifier = Modifier.padding(horizontal = 16.dp),
                             style = MaterialTheme.typography.titleMedium,
                             color = Color(0xFF2196F3)

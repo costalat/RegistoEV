@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,12 +20,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.registoev.app.data.EvChargeEntity
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun KmHistoryScreen(charges: List<EvChargeEntity>) {
-    val sortedCharges = charges.sortedBy { it.date }
+    // Ordenar primeiro por Dia (ignorando hora) e depois por Odómetro para garantir coerência
+    val sortedCharges = charges.sortedWith(
+        compareBy<EvChargeEntity> { 
+            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+            cal.timeInMillis 
+        }.thenBy { it.odometer }
+    )
     
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -72,7 +80,7 @@ fun KmHistoryScreen(charges: List<EvChargeEntity>) {
 
 @Composable
 fun KmItem(charge: EvChargeEntity, diff: Int?) {
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -169,7 +177,7 @@ fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
 
 @Composable
 fun ChargeHistoryItem(charge: EvChargeEntity) {
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -209,39 +217,71 @@ fun ChargeHistoryItem(charge: EvChargeEntity) {
             
             Spacer(modifier = Modifier.height(16.dp)) // Reduzido de 28.dp para 16.dp para um look mais compacto
             
-            // LINHA INFERIOR: Rede | kWh
+            // LINHA INFERIOR: Rede + Posto | kWh
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Info Badge: Rede utilizada com fundo discreto
+                // Info Badges: Rede e Código do Posto
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.03f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Bolt,
-                        contentDescription = null,
-                        tint = Color(0xFF26C6DA),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = charge.chargeType,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.LightGray,
-                        fontWeight = FontWeight.Medium
-                    )
+                    // Badge: Rede
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = Color(0xFF26C6DA),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = charge.chargeType,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Badge: Código do Posto (Independente - Design Identêntico)
+                    if (charge.codPosto.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White.copy(alpha = 0.03f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EvStation,
+                                contentDescription = null,
+                                tint = Color(0xFF2196F3), // Azul para distinguir da rede
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = charge.codPosto,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
                 
                 // Resultado Master: Destaque equilibrado para kWh
                 Row(verticalAlignment = Alignment.Bottom) {
+                    val kwhText = remember(charge.kwh) { String.format(Locale.getDefault(), "%.1f", charge.kwh) }
                     Text(
-                        text = String.format(Locale.getDefault(), "%.1f", charge.kwh),
+                        text = kwhText,
                         style = MaterialTheme.typography.headlineSmall, // Reduzido de displaySmall para headlineMedium
                         fontWeight = FontWeight.W900,
                         color = Color(0xFF4CAF50),

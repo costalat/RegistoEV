@@ -165,9 +165,10 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
+        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")) }
         val periodDisplay = when(selectedPeriodType) {
             HistoryPeriod.WEEK -> "Semana ${baseCalendar.get(Calendar.WEEK_OF_YEAR)}"
-            HistoryPeriod.MONTH -> SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(baseCalendar.time)
+            HistoryPeriod.MONTH -> monthFormat.format(baseCalendar.time)
             HistoryPeriod.YEAR -> baseCalendar.get(Calendar.YEAR).toString()
         }
 
@@ -190,7 +191,7 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
             )
             StatCard(
                 label = "Consumo Médio",
-                value = String.format(Locale.getDefault(), "%.1f", avgConsumption),
+                value = remember(avgConsumption) { String.format(Locale.getDefault(), "%.1f", avgConsumption) },
                 unit = "kWh/100",
                 color = Color(0xFF4CAF50),
                 modifier = Modifier.weight(1.2f)
@@ -370,9 +371,10 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
+        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")) }
         val periodDisplay = when(selectedPeriodType) {
             HistoryPeriod.WEEK -> "Semana ${baseCalendar.get(Calendar.WEEK_OF_YEAR)}"
-            HistoryPeriod.MONTH -> SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(baseCalendar.time)
+            HistoryPeriod.MONTH -> monthFormat.format(baseCalendar.time)
             HistoryPeriod.YEAR -> baseCalendar.get(Calendar.YEAR).toString()
         }
 
@@ -505,7 +507,8 @@ fun BarChart(data: Map<String, Float>) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(text = label, color = Color.White, fontSize = 12.sp)
-                    Text(text = String.format(Locale.getDefault(), "%.1f kWh", value), color = Color.Gray, fontSize = 12.sp)
+                    val valueText = remember(value) { String.format(Locale.getDefault(), "%.1f kWh", value) }
+                    Text(text = valueText, color = Color.Gray, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Box(

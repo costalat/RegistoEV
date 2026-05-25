@@ -137,19 +137,58 @@ fun AddChargeScreen(
     val otherCharges = existingCharges.filter { it.id != editingRecord?.id }
     val odoError = remember(odometerValue, selectedDate, otherCharges, editingRecord) {
         if (odometerValue <= 0) return@remember null
+        
+        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+        calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
+        val startOfCurrentDay = calendar.timeInMillis
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+        val startOfNextDay = calendar.timeInMillis
+
         if (editingRecord == null) {
-            val absoluteMaxOdo = otherCharges.maxOfOrNull { it.odometer } ?: 0
-            if (odometerValue <= absoluteMaxOdo) return@remember "Deve ser superior ao último registo: $absoluteMaxOdo km"
+            // REGRA PARA NOVO REGISTO: Validar contra histórico existente na mesma data ou datas adjacentes
+            
+            // 1. Limites entre dias diferentes
+            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Deve ser superior aos dias anteriores ($maxPrevDays km)"
+            
+            val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
+            if (minNextDays != null && odometerValue > minNextDays) return@remember "Deve ser inferior aos dias seguintes ($minNextDays km)"
+
+            // 2. Limites no próprio dia (caso esteja a inserir um registo com data retroativa para hoje)
+            val sameDayCharges = otherCharges.filter { it.date in startOfCurrentDay until startOfNextDay }
+            if (sameDayCharges.isNotEmpty()) {
+                // Como é novo, assumimos que se insere no fim da lista do dia (ou no meio se houver km maiores)
+                val maxSameDayBelow = sameDayCharges.filter { it.odometer < odometerValue }.maxOfOrNull { it.odometer }
+                val minSameDayAbove = sameDayCharges.filter { it.odometer > odometerValue }.minOfOrNull { it.odometer }
+                
+                // Validação lógica: se estamos a tentar inserir um valor que "atropela" a ordem crescente
+                val hasHigherKmToday = sameDayCharges.any { it.odometer >= odometerValue && it.date <= selectedDate }
+                val hasLowerKmToday = sameDayCharges.any { it.odometer <= odometerValue && it.date >= selectedDate }
+                
+                // Simplificação: o valor deve apenas encaixar na sequência crescente global
+                val absoluteMax = otherCharges.maxOfOrNull { it.odometer } ?: 0
+                if (selectedDate >= System.currentTimeMillis() - 60000 && odometerValue <= absoluteMax) {
+                    return@remember "Deve ser superior ao último registo: $absoluteMax km"
+                }
+            } else {
+                // Sem registos no dia, basta ser maior que o passado e menor que o futuro
+            }
         } else {
-            val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
-            calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
-            val startOfCurrentDay = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-            val startOfNextDay = calendar.timeInMillis
-            val maxPrev = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
-            if ((maxPrev != null) && (odometerValue < maxPrev)) return@remember "Mínimo permitido: $maxPrev km"
-            val minNext = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
-            if ((minNext != null) && (odometerValue > minNext)) return@remember "Máximo permitido: $minNext km"
+            // REGRA PARA EDIÇÃO: Validação cronológica detalhada (já implementada)
+            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Mínimo permitido (dias anteriores): $maxPrevDays km"
+            
+            val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
+            if (minNextDays != null && odometerValue > minNextDays) return@remember "Máximo permitido (dias seguintes): $minNextDays km"
+
+            val sameDayCharges = otherCharges.filter { it.date in startOfCurrentDay until startOfNextDay }
+            if (sameDayCharges.isNotEmpty()) {
+                val maxSameDayBelow = sameDayCharges.filter { it.odometer < (editingRecord.odometer) }.maxOfOrNull { it.odometer }
+                val minSameDayAbove = sameDayCharges.filter { it.odometer > (editingRecord.odometer) }.minOfOrNull { it.odometer }
+
+                if (maxSameDayBelow != null && odometerValue <= maxSameDayBelow) return@remember "Deve ser superior ao registo anterior do mesmo dia: $maxSameDayBelow km"
+                if (minSameDayAbove != null && odometerValue >= minSameDayAbove) return@remember "Deve ser inferior ao registo seguinte do mesmo dia: $minSameDayAbove km"
+            }
         }
         null
     }

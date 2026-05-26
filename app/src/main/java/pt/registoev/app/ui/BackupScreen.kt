@@ -1,5 +1,9 @@
 package pt.registoev.app.ui
 
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,6 +46,7 @@ fun BackupScreen(
     charges: List<EvChargeEntity>,
     onExportCsv: (Uri, String) -> Unit
 ) {
+    val ctx = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
 
@@ -56,6 +62,10 @@ fun BackupScreen(
     
     var csvContentToExport by remember { mutableStateOf("") }
     var pendingFileName by remember { mutableStateOf("") }
+    
+    // PDF Export States
+    var pdfBaseCalendar by remember { mutableStateOf<Calendar?>(null) }
+    var pdfChargesToExport by remember { mutableStateOf<List<EvChargeEntity>>(emptyList()) }
 
     val csvLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
@@ -67,6 +77,24 @@ fun BackupScreen(
             showExportOptions = false
             selectedExportType = null
             selectedExportPeriodType = null
+        }
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri != null && pdfBaseCalendar != null) {
+            val success = exportMonthlyReportToPdf(ctx, uri, pdfChargesToExport, pdfBaseCalendar!!)
+            if (success) {
+                message = "Relatório PDF gerado com sucesso!"
+                isError = false
+            } else {
+                message = "Erro ao gerar PDF oficial."
+                isError = true
+            }
+            showExportOptions = false
+            selectedExportType = null
+            pdfBaseCalendar = null
         }
     }
 
@@ -186,9 +214,16 @@ fun BackupScreen(
                     set(Calendar.YEAR, year)
                     set(Calendar.MONTH, month)
                 }
-                csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Mês", cal)
-                pendingFileName = "export_${selectedExportType!!.lowercase()}_mes_${year}_${month + 1}.csv"
-                csvLauncher.launch(pendingFileName)
+                
+                if (selectedExportType == "Carregamentos") {
+                    pdfBaseCalendar = cal
+                    pdfChargesToExport = filterChargesForPeriod(charges, "Mês", cal)
+                    // Não lançamos logo o launcher, deixamos o utilizador escolher CSV ou PDF Oficial no Step 3
+                } else {
+                    csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Mês", cal)
+                    pendingFileName = "export_${selectedExportType!!.lowercase()}_mes_${year}_${month + 1}.csv"
+                    csvLauncher.launch(pendingFileName)
+                }
                 showMonthPicker = false
             }
         )
@@ -279,11 +314,47 @@ fun BackupScreen(
                                 ExportOptionChip("Mês", Icons.Default.CalendarMonth) { showMonthPicker = true }
                                 ExportOptionChip("Ano", Icons.Default.CalendarToday) { showYearPicker = true }
                             }
+
+                            // Step 3: Escolha do Formato (apenas após escolher Mês + Carregamentos)
+                            if (pdfBaseCalendar != null && selectedExportType == "Carregamentos") {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.05f))
+                                Text("FORMATO DO RELATÓRIO", style = MaterialTheme.typography.labelSmall, color = Color.Gray, letterSpacing = 1.sp)
+                                Row(modifier = Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { 
+                                            csvContentToExport = generateCsvForPeriod(charges, "Carregamentos", "Mês", pdfBaseCalendar!!)
+                                            csvLauncher.launch("export_carregamentos_mes.csv") 
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("CSV Simples", color = Color.White)
+                                    }
+                                    
+                                    Button(
+                                        onClick = { 
+                                            val monthYear = SimpleDateFormat("MM_yyyy", Locale.getDefault()).format(pdfBaseCalendar!!.time)
+                                            pdfLauncher.launch("reporte_mensal_${monthYear}.pdf") 
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("PDF Oficial", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                     
                     TextButton(
-                        onClick = { showExportOptions = false; selectedExportType = null; selectedExportPeriodType = null },
+                        onClick = { 
+                            showExportOptions = false
+                            selectedExportType = null
+                            selectedExportPeriodType = null
+                            pdfBaseCalendar = null
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Cancelar", color = Color.DarkGray)
@@ -479,6 +550,196 @@ fun BackupActionCard(title: String, description: String, icon: ImageVector, butt
                 Text(buttonText, fontWeight = FontWeight.Bold, color = textColor)
             }
         }
+    }
+}
+
+fun filterChargesForPeriod(charges: List<EvChargeEntity>, periodType: String, calendar: Calendar): List<EvChargeEntity> {
+    val startTime: Long
+    val endTime: Long
+    val baseCal = calendar.clone() as Calendar
+    when (periodType) {
+        "Semana" -> {
+            baseCal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+            baseCal.set(Calendar.HOUR_OF_DAY, 0); baseCal.set(Calendar.MINUTE, 0); baseCal.set(Calendar.SECOND, 0); baseCal.set(Calendar.MILLISECOND, 0)
+            startTime = baseCal.timeInMillis
+            baseCal.add(Calendar.DAY_OF_YEAR, 7)
+            endTime = baseCal.timeInMillis
+        }
+        "Mês" -> {
+            baseCal.set(Calendar.DAY_OF_MONTH, 1)
+            baseCal.set(Calendar.HOUR_OF_DAY, 0); baseCal.set(Calendar.MINUTE, 0); baseCal.set(Calendar.SECOND, 0); baseCal.set(Calendar.MILLISECOND, 0)
+            startTime = baseCal.timeInMillis
+            baseCal.add(Calendar.MONTH, 1)
+            endTime = baseCal.timeInMillis
+        }
+        "Ano" -> {
+            baseCal.set(Calendar.DAY_OF_YEAR, 1)
+            baseCal.set(Calendar.HOUR_OF_DAY, 0); baseCal.set(Calendar.MINUTE, 0); baseCal.set(Calendar.SECOND, 0); baseCal.set(Calendar.MILLISECOND, 0)
+            startTime = baseCal.timeInMillis
+            baseCal.add(Calendar.YEAR, 1)
+            endTime = baseCal.timeInMillis
+        }
+        else -> { startTime = 0; endTime = Long.MAX_VALUE }
+    }
+    return charges.filter { it.date in startTime until endTime }.sortedBy { it.date }
+}
+
+fun exportMonthlyReportToPdf(
+    context: Context,
+    uri: Uri,
+    charges: List<EvChargeEntity>,
+    calendar: Calendar
+): Boolean {
+    val prefs = context.getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE)
+    val unidade = prefs.getString("user_unit", "") ?: ""
+    val condutor = prefs.getString("driver_name", "") ?: ""
+    val marca = prefs.getString("vehicle_brand", "") ?: ""
+    val modelo = prefs.getString("vehicle_model", "") ?: ""
+    val matricula = prefs.getString("vehicle_plate", "") ?: ""
+
+    val reportMonth = SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(calendar.time).uppercase()
+    val pdfDocument = PdfDocument()
+    val textPaint = Paint().apply { textSize = 10f; isAntiAlias = true }
+    val titlePaint = Paint().apply { 
+        textSize = 12f 
+        isFakeBoldText = true 
+        isAntiAlias = true 
+        textAlign = Paint.Align.CENTER 
+    }
+    
+    // Dimensões A4 (72 DPI)
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 40f
+    
+    val filteredCharges = charges.filter { it.chargeType != "Nenhum" }
+    var currentItemIndex = 0
+    var pageNumber = 1
+
+    while (currentItemIndex < filteredCharges.size || (filteredCharges.isEmpty() && currentItemIndex == 0)) {
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        // --- 1. HEADER (APENAS NA PRIMEIRA PÁGINA) ---
+        var currentY = 50f
+        if (pageNumber == 1) {
+            textPaint.textAlign = Paint.Align.CENTER
+            val headerCenterX = pageWidth - margin - 60f
+            
+            canvas.drawText("VISTO", headerCenterX, currentY, textPaint)
+            canvas.drawText("Cmdt/Dir/Chefe", headerCenterX, currentY + 15f, textPaint)
+            
+            canvas.drawLine(headerCenterX - 50f, currentY + 40f, headerCenterX + 50f, currentY + 40f, textPaint)
+            canvas.drawLine(headerCenterX - 15f, currentY + 50f, headerCenterX + 15f, currentY + 50f, textPaint)
+
+            currentY = 130f
+            canvas.drawText("REPORTE MENSAL DOS CARREGAMENTOS ELÉTRICOS", pageWidth / 2f, currentY, titlePaint)
+
+            currentY = 170f
+            textPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText("U/E/O: $unidade", margin, currentY, textPaint)
+            canvas.drawLine(margin + 35f, currentY + 2f, margin + 180f, currentY + 2f, textPaint)
+            
+            canvas.drawText("Mês: $reportMonth", margin, currentY + 20f, textPaint)
+            canvas.drawLine(margin + 25f, currentY + 22f, margin + 180f, currentY + 22f, textPaint)
+            
+            val veiculoStr = "Dados viatura (Marca/Modelo/Matrícula): $marca / $modelo / $matricula"
+            canvas.drawText(veiculoStr, margin, currentY + 45f, textPaint)
+            canvas.drawLine(margin + 175f, currentY + 47f, pageWidth - margin, currentY + 47f, textPaint)
+            
+            currentY = 235f // Posição de topo da tabela na página 1
+        } else {
+            currentY = 60f // Posição de topo da tabela nas páginas seguintes
+        }
+
+        // --- 4. TABELA ---
+        val tableTop = currentY
+        val colWidths = floatArrayOf(75f, 80f, 45f, 60f, 90f, 75f, 90f)
+        val headers = arrayOf("Data de", "Tipologia de", "KW", "Km da", "Nome/Código", "Localidade", "Condutor")
+        val headers2 = arrayOf("carregamento", "Carregamento", "abastecidos", "viatura", "Posto", "", "")
+        
+        var currentX = margin
+        val rowHeight = 25f
+        
+        canvas.drawLine(margin, tableTop, pageWidth - margin, tableTop, textPaint)
+        canvas.drawLine(margin, tableTop + rowHeight * 1.5f, pageWidth - margin, tableTop + rowHeight * 1.5f, textPaint)
+
+        for (i in headers.indices) {
+            textPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText(headers[i], currentX + 5f, tableTop + 15f, textPaint)
+            canvas.drawText(headers2[i], currentX + 5f, tableTop + 27f, textPaint)
+            canvas.drawLine(currentX, tableTop, currentX, tableTop + rowHeight * 1.5f, textPaint)
+            currentX += colWidths[i]
+        }
+        canvas.drawLine(pageWidth - margin, tableTop, pageWidth - margin, tableTop + rowHeight * 1.5f, textPaint)
+
+        // Desenhar Linhas de Dados
+        var y = tableTop + rowHeight * 1.5f
+        
+        // Calcular quantos itens cabem nesta página específica
+        val spaceAvailable = 720f - y // Deixar espaço para o rodapé se for a última página
+        val itemsOnThisPage = (spaceAvailable / rowHeight).toInt().coerceAtMost(filteredCharges.size - currentItemIndex)
+        
+        for (i in 0 until itemsOnThisPage) {
+            val charge = filteredCharges[currentItemIndex + i]
+            currentX = margin
+            
+            val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(charge.date))
+            val rowData = arrayOf(
+                dateStr,
+                charge.chargeType.replace("Rede ", ""),
+                String.format(Locale.US, "%.1f", charge.kwh),
+                charge.odometer.toString(),
+                charge.codPosto,
+                "", 
+                condutor
+            )
+
+            for (j in rowData.indices) {
+                canvas.drawText(rowData[j], currentX + 5f, y + 18f, textPaint)
+                canvas.drawLine(currentX, y, currentX, y + rowHeight, textPaint)
+                currentX += colWidths[j]
+            }
+            canvas.drawLine(pageWidth - margin, y, pageWidth - margin, y + rowHeight, textPaint)
+            y += rowHeight
+            canvas.drawLine(margin, y, pageWidth - margin, y, textPaint)
+        }
+        
+        currentItemIndex += itemsOnThisPage
+        if (filteredCharges.isEmpty()) currentItemIndex = 1
+        val isLastPage = currentItemIndex >= filteredCharges.size
+
+        // --- 5. RODAPÉ (APENAS NA ÚLTIMA PÁGINA) ---
+        if (isLastPage) {
+            val footerY = y + 40f
+            textPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText("Tipologia de carregamento:", margin, footerY, textPaint)
+            canvas.drawText("(a)  Postos da rede do Exército;", margin, footerY + 15f, textPaint)
+            canvas.drawText("(b)  Tomada local da U/E/O;", margin, footerY + 28f, textPaint)
+            canvas.drawText("(c)  Posto da rede pública (MOBI.E).", margin, footerY + 41f, textPaint)
+
+            val signatureY = 780f
+            textPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText("O Chefe da SecLog", pageWidth - margin - 80f, signatureY, textPaint)
+            canvas.drawLine(pageWidth - margin - 150f, signatureY + 25f, pageWidth - margin - 10f, signatureY + 25f, textPaint)
+            canvas.drawLine(pageWidth - margin - 100f, signatureY + 35f, pageWidth - margin - 60f, signatureY + 35f, textPaint)
+        }
+
+        pdfDocument.finishPage(page)
+        pageNumber++
+    }
+
+    return try {
+        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+            pdfDocument.writeTo(outputStream)
+        }
+        pdfDocument.close()
+        true
+    } catch (e: Exception) {
+        e.printStackTrace()
+        pdfDocument.close()
+        false
     }
 }
 

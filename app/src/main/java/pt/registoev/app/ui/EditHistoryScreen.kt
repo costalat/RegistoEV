@@ -3,16 +3,20 @@ package pt.registoev.app.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.registoev.app.data.EvChargeEntity
 import java.text.SimpleDateFormat
-import java.util.*
 import java.util.*
 
 @Composable
@@ -68,86 +71,77 @@ fun EditHistoryScreen(
                 Text(
                     "Deseja remover ${selectedIds.size} registos?",
                     color = Color.LightGray
-                ) 
+                )
             },
             confirmButton = {
                 Button(
                     onClick = {
                         onDeleteSelected(selectedIds.toList())
-                        isSelectionMode = false
                         selectedIds = emptySet()
+                        isSelectionMode = false
                         showDeleteConfirm = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Eliminar", fontWeight = FontWeight.Bold)
-                }
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                ) { Text("Eliminar", color = Color.White) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancelar", color = Color.LightGray)
+                    Text("Cancelar", color = Color.Gray)
                 }
             }
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Toolbar de seleção
         AnimatedVisibility(
-            visible = charges.isNotEmpty(),
+            visible = isSelectionMode,
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                color = Color(0xFF1C1C1E),
+                modifier = Modifier.fillMaxWidth(),
+                border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
             ) {
-                if (isSelectionMode) {
-                    IconButton(onClick = { 
-                        isSelectionMode = false
-                        selectedIds = emptySet()
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(onClick = { isSelectionMode = false; selectedIds = emptySet() }) {
+                        Icon(Icons.Default.Close, null, tint = Color.White)
                     }
+                    
                     Text(
                         text = "${selectedIds.size} selecionados",
                         color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        style = MaterialTheme.typography.titleMedium
                     )
-                    Button(
-                        onClick = { showDeleteConfirm = true },
-                        enabled = selectedIds.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE53935),
-                            disabledContainerColor = Color(0xFFE53935).copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Apagar")
-                    }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f)) // Empurra o conteúdo para a direita
-                    Text(
-                        text = "Apagar  ->",
-                        style = MaterialTheme.typography.titleMedium, // Aumentado de labelLarge para titleMedium
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Bold, // Aumentado peso para Bold para acompanhar o tamanho
-                        letterSpacing = 0.5.sp
-                    )
-                    IconButton(onClick = { isSelectionMode = true }) {
-                        Icon(Icons.Default.SelectAll, null, tint = Color(0xFFF5E1A4)) // Beje Suave
+
+                    Row {
+                        IconButton(onClick = { 
+                            selectedIds = if (selectedIds.size == charges.size) emptySet() else charges.map { it.id }.toSet()
+                        }) {
+                            Icon(Icons.Default.SelectAll, null, tint = Color.White)
+                        }
+                        IconButton(
+                            onClick = { showDeleteConfirm = true },
+                            enabled = selectedIds.isNotEmpty()
+                        ) {
+                            Icon(
+                                Icons.Default.Delete, 
+                                null, 
+                                tint = if (selectedIds.isNotEmpty()) Color(0xFFE53935) else Color.DarkGray
+                            )
+                        }
                     }
                 }
             }
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
+        
         if (charges.isEmpty()) {
             EmptyState("Sem registos para gerir.")
         } else {
@@ -169,7 +163,13 @@ fun EditHistoryScreen(
                                 selectedIds + charge.id
                             }
                         },
-                        onEditClick = { onEditClick(charge) }
+                        onEditClick = { onEditClick(charge) },
+                        onLongClick = { 
+                            if (!isSelectionMode) {
+                                isSelectionMode = true
+                                selectedIds = setOf(charge.id)
+                            }
+                        }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(110.dp)) }
@@ -178,6 +178,7 @@ fun EditHistoryScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditCard(
     charge: EvChargeEntity,
@@ -185,12 +186,17 @@ fun EditCard(
     isSelectionMode: Boolean,
     dateFormat: SimpleDateFormat,
     onToggleSelection: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)),
+            .clip(RoundedCornerShape(24.dp))
+            .combinedClickable(
+                onClick = { if (isSelectionMode) onToggleSelection() else onEditClick() },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFF2196F3).copy(alpha = 0.1f) else Color(0xFF1C1C1E)
@@ -198,8 +204,7 @@ fun EditCard(
         border = androidx.compose.foundation.BorderStroke(
             width = 0.5.dp,
             color = if (isSelected) Color(0xFF2196F3) else Color.White.copy(alpha = 0.1f)
-        ),
-        onClick = { if (isSelectionMode) onToggleSelection() else onEditClick() }
+        )
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
@@ -243,6 +248,78 @@ fun EditCard(
                 }
                 
                 if (!isSelectionMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Badge: Tipo de Carga
+                            if (charge.chargeType != "Nenhum") {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White.copy(alpha = 0.03f))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bolt,
+                                        contentDescription = null,
+                                        tint = Color(0xFF26C6DA),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = charge.chargeType,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+
+                            // Badge: Código do Posto
+                            if (charge.codPosto.isNotEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White.copy(alpha = 0.03f))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EvStation,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2196F3),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = charge.codPosto,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+                        }
+
+                        // Valor kWh Alinhado na horizontal com os badges (à Direita) - Tamanho aumentado
+                        if (charge.kwh > 0) {
+                            val kwhText = remember(charge.kwh) { String.format(Locale.getDefault(), "%.1f kWh", charge.kwh) }
+                            Text(
+                                text = kwhText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

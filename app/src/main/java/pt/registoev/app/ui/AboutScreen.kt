@@ -60,7 +60,7 @@ fun AboutScreen() {
         )
         
         Text(
-            text = "Versão 1.3",
+            text = "Versão 1.4",
             style = MaterialTheme.typography.bodySmall, // Restaurado
             color = Color.Gray
         )

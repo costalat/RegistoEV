@@ -1,0 +1,28 @@
+# Gradle files
+.gradle/
+build/
+/*/build/
+
+# Android Studio / IntelliJ files
+.idea/
+*.iml
+*.iws
+*.ipr
+/local.properties
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Memory dumps
+*.hprof
+
+# Backup and temp files
+*.bak
+*.swp
+*~
+GIT/

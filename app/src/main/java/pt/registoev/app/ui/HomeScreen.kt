@@ -101,6 +101,14 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                    if (charge.localidade.isNotBlank()) {
+                        Text(
+                            text = charge.localidade,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF2196F3),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 
                 // Valor em destaque no canto superior direito (Estilo iOS)
@@ -200,7 +208,7 @@ fun ChargeHistoryItem(charge: EvChargeEntity) {
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = charge.destination,
+                    text = charge.localidade,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,

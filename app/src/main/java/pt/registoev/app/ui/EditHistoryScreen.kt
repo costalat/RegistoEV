@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -241,21 +240,7 @@ fun EditCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = charge.origin,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = Color.DarkGray,
-                        modifier = Modifier.padding(horizontal = 12.dp).size(18.dp)
-                    )
-                    Text(
-                        text = charge.destination,
+                        text = if (charge.localidade.isNotBlank()) "${charge.origin} → ${charge.localidade}" else "${charge.origin} → ${charge.destination}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
                         color = Color.White,

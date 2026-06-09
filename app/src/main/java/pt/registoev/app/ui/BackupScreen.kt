@@ -658,9 +658,9 @@ fun exportMonthlyReportToPdf(
 
         // --- 4. TABELA ---
         val tableTop = currentY
-        val colWidths = floatArrayOf(75f, 80f, 45f, 60f, 90f, 75f, 90f)
-        val headers = arrayOf("Data de", "Tipologia de", "KW", "Km da", "Nome/Código", "Localidade", "Condutor")
-        val headers2 = arrayOf("carregamento", "Carregamento", "abastecidos", "viatura", "Posto", "", "")
+        val colWidths = floatArrayOf(75f, 60f, 45f, 55f, 80f, 85f, 90f)
+        val headers = arrayOf("Data", "Tipo carreg", "KW", "Km", "Código posto", "Localidade", "Condutor")
+        val headers2 = arrayOf("", "", "abast", "", "", "", "")
         
         var currentX = margin
         val rowHeight = 25f
@@ -700,7 +700,9 @@ fun exportMonthlyReportToPdf(
             )
 
             for (j in rowData.indices) {
-                canvas.drawText(rowData[j], currentX + 5f, y + 18f, textPaint)
+                val maxWidth = colWidths[j] - 8f
+                val displayText = truncateText(rowData[j], textPaint, maxWidth)
+                canvas.drawText(displayText, currentX + 5f, y + 18f, textPaint)
                 canvas.drawLine(currentX, y, currentX, y + rowHeight, textPaint)
                 currentX += colWidths[j]
             }
@@ -744,6 +746,21 @@ fun exportMonthlyReportToPdf(
         pdfDocument.close()
         false
     }
+}
+
+private fun truncateText(text: String, paint: Paint, maxWidth: Float): String {
+    if (paint.measureText(text) <= maxWidth) return text
+    
+    val ellipsis = "..."
+    val ellipsisWidth = paint.measureText(ellipsis)
+    
+    if (ellipsisWidth > maxWidth) return ""
+    
+    var truncated = text
+    while (truncated.isNotEmpty() && paint.measureText(truncated + ellipsis) > maxWidth) {
+        truncated = truncated.substring(0, truncated.length - 1)
+    }
+    return truncated + ellipsis
 }
 
 fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType: String, calendar: Calendar): String {

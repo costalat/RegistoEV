@@ -13,5 +13,6 @@ data class EvChargeEntity(
  val kwh: Double,
  val date: Long,
  val codPosto: String = "",
- val localidade: String = ""
+ val localidade: String = "",
+ val liters: Double? = null
 )

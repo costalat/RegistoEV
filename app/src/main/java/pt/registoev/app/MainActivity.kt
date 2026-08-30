@@ -52,6 +52,7 @@ enum class AppTab(val title: String, val icon: ImageVector) {
     NEW("Novo", Icons.Default.Add),
     KM("Movimentos", Icons.Default.DirectionsCar),
     CHARGES("Cargas", Icons.Default.Bolt),
+    FUEL("Combustível", Icons.Default.LocalGasStation),
     EDIT("Edição", Icons.Default.Edit),
     BACKUP("Gestão", Icons.Default.Storage),
     SETTINGS("Definições", Icons.Default.Settings),
@@ -158,10 +159,10 @@ class MainActivity : ComponentActivity() {
                                             AddChargeScreen(
                                                 existingCharges = charges,
                                                 editingRecord = editingRecord,
-                                                onSave = { origin, destination, odometer, chargeType, kwh, date, id, codPosto ->
+                                                onSave = { origin, destination, odometer, chargeType, kwh, date, id, codPosto, liters, manualLocality ->
                                                     scope.launch {
-                                                        var locality = ""
-                                                        if (codPosto.isNotBlank()) {
+                                                        var locality = manualLocality ?: ""
+                                                        if (locality.isEmpty() && codPosto.isNotBlank()) {
                                                             if (id != null && codPosto == (editingRecord?.codPosto ?: "")) {
                                                                 locality = editingRecord?.localidade ?: ""
                                                             } else {
@@ -172,7 +173,7 @@ class MainActivity : ComponentActivity() {
                                                         val entity = EvChargeEntity(
                                                             id = id ?: 0, origin = origin, destination = destination,
                                                             odometer = odometer, chargeType = chargeType, kwh = kwh, date = date,
-                                                            codPosto = codPosto, localidade = locality
+                                                            codPosto = codPosto, localidade = locality, liters = liters
                                                         )
                                                         dao.insert(entity)
                                                         
@@ -196,6 +197,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         AppTab.KM -> KmHistoryScreen(charges = charges)
                                         AppTab.CHARGES -> ChargeHistoryScreen(charges = charges)
+                                        AppTab.FUEL -> FuelHistoryScreen(charges = charges)
                                         AppTab.EDIT -> {
                                             EditHistoryScreen(
                                                 charges = charges,

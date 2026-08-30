@@ -40,7 +40,7 @@ import java.util.*
 fun AddChargeScreen(
     existingCharges: List<EvChargeEntity>,
     editingRecord: EvChargeEntity? = null,
-    onSave: (String, String, Int, String, Double, Long, Long?, String) -> Unit,
+    onSave: (String, String, Int, String, Double, Long, Long?, String, Double?, String?) -> Unit,
     onCancelEdit: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -69,6 +69,8 @@ fun AddChargeScreen(
     var odometer by remember(editId) { mutableStateOf(editingRecord?.odometer?.toString() ?: "") }
     var chargeType by remember(editId) { mutableStateOf(editingRecord?.chargeType ?: "Nenhum") }
     var kwh by remember(editId) { mutableStateOf(TextFieldValue(editingRecord?.kwh?.toString() ?: "")) }
+    var liters by remember(editId) { mutableStateOf(TextFieldValue(editingRecord?.liters?.toString() ?: "")) }
+    var fuelLocation by remember(editId) { mutableStateOf(editingRecord?.localidade ?: "") }
     var codPosto by remember(editId) { mutableStateOf(editingRecord?.codPosto ?: "") }
     var selectedDate by remember(editId) { mutableLongStateOf(editingRecord?.date ?: System.currentTimeMillis()) }
     
@@ -77,9 +79,10 @@ fun AddChargeScreen(
 
     val odometerFocusRequester = remember { FocusRequester() }
     val kwhFocusRequester = remember { FocusRequester() }
+    val fuelLocationFocusRequester = remember { FocusRequester() }
     val codPostoFocusRequester = remember { FocusRequester() }
 
-    val chargeTypes = listOf("Nenhum", "Portátil", "Rede MOBI.E", "Rede Exército")
+    val chargeTypes = listOf("Nenhum", "Portátil", "Rede MOBI.E", "Rede VOLTE.E", "Combustível")
 
     // Diálogos para gerir localizações
     var pendingLocationToAdd by remember { mutableStateOf<String?>(null) }
@@ -123,10 +126,15 @@ fun AddChargeScreen(
             }
             3 -> { // Passo Final: Guardar Efetivamente
                 val odoVal = odometer.toIntOrNull() ?: 0
-                val kwhVal = if (chargeType == "Nenhum") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
-                onSave(origin, destination, odoVal, chargeType, kwhVal, selectedDate, editingRecord?.id, codPosto)
+                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
+                val litersVal = if (chargeType == "Combustível") (liters.text.toDoubleOrNull() ?: 0.0) else null
+                
+                // Se for combustível, passamos o local manual
+                val manualLoc = if (chargeType == "Combustível") fuelLocation else null
+                
+                onSave(origin, destination, odoVal, chargeType, kwhVal, selectedDate, editingRecord?.id, codPosto, litersVal, manualLoc)
                 if (editingRecord == null) {
-                    origin = ""; destination = ""; odometer = ""; kwh = TextFieldValue(""); chargeType = "Nenhum"; codPosto = ""
+                    origin = ""; destination = ""; odometer = ""; kwh = TextFieldValue(""); liters = TextFieldValue(""); fuelLocation = ""; chargeType = "Nenhum"; codPosto = ""
                 }
             }
         }
@@ -357,7 +365,7 @@ fun AddChargeScreen(
 
         // --- CARREGAMENTO ---
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("TIPO DE CARGA", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
+            Text("TIPO DE ABASTECIMENTO", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
             IOSRowCard {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -367,7 +375,7 @@ fun AddChargeScreen(
                             val activeColor = when (type) {
                                 "Portátil" -> Color(0xFFFFB300)
                                 "Rede MOBI.E" -> Color(0xFF26C6DA)
-                                "Rede Exército" -> Color(0xFF046A38)
+                                "Rede VOLTE.E" -> Color(0xFF046A38)
                                 else -> Color.White.copy(alpha = 0.15f)
                             }
                             Box(
@@ -384,28 +392,75 @@ fun AddChargeScreen(
 
                     AnimatedVisibility(visible = chargeType != "Nenhum", enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable { 
-                                    kwhFocusRequester.requestFocus()
-                                    kwh = kwh.copy(selection = TextRange(0, kwh.text.length))
-                                }, 
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Energia", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
-                                Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
-                                    BasicTextField(
-                                        value = kwh, onValueChange = { kwh = it }, 
-                                        modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) kwh = kwh.copy(selection = TextRange(0, kwh.text.length)) },
-                                        textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50)),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFF4CAF50)), singleLine = true,
-                                        decorationBox = { innerTextField ->
-                                            if (kwh.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
-                                            innerTextField()
-                                        }
-                                    )
+                            if (chargeType != "Combustível") {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { 
+                                        kwhFocusRequester.requestFocus()
+                                        kwh = kwh.copy(selection = TextRange(0, kwh.text.length))
+                                    }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Energia", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = kwh, onValueChange = { kwh = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) kwh = kwh.copy(selection = TextRange(0, kwh.text.length)) },
+                                            textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50)),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFF4CAF50)), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (kwh.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                    Text("kWh", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
                                 }
-                                Text("kWh", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
+                            } else {
+                                // Campo de Litros para Combustível
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { 
+                                        kwhFocusRequester.requestFocus()
+                                        liters = liters.copy(selection = TextRange(0, liters.text.length))
+                                    }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Quantidade", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = liters, onValueChange = { liters = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) liters = liters.copy(selection = TextRange(0, liters.text.length)) },
+                                            textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300)),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFFFFB300)), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (liters.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                    Text("l", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { fuelLocationFocusRequester.requestFocus() }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Local de abastecimento", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = fuelLocation, onValueChange = { fuelLocation = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(fuelLocationFocusRequester),
+                                            textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color.White),
+                                            cursorBrush = SolidColor(Color.White), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (fuelLocation.isEmpty()) Text("Posto / Localidade", color = Color.DarkGray, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                }
                             }
                             
                             if (chargeType == "Rede MOBI.E") {
@@ -447,7 +502,10 @@ fun AddChargeScreen(
 
         // --- BOTÃO GUARDAR ---
         Spacer(modifier = Modifier.height(8.dp))
-        val isFormValid = origin.isNotBlank() && destination.isNotBlank() && odometer.isNotBlank() && odoError == null && (chargeType == "Nenhum" || kwh.text.isNotBlank())
+        val isFormValid = origin.isNotBlank() && destination.isNotBlank() && odometer.isNotBlank() && odoError == null && 
+                (chargeType == "Nenhum" || 
+                 (chargeType == "Combustível" && liters.text.isNotBlank() && fuelLocation.isNotBlank()) || 
+                 (chargeType != "Combustível" && kwh.text.isNotBlank()))
         Button(
             onClick = { checkAndSave(0) },
             modifier = Modifier.fillMaxWidth().height(52.dp), enabled = isFormValid,

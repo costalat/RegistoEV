@@ -6,8 +6,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -75,7 +73,7 @@ class MainActivity : ComponentActivity() {
 
         // Lógica de Sincronização Inicial V1.7.1 (Mapa em Memória)
         lifecycleScope.launch(Dispatchers.IO) {
-            val prefs = getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("registoev_prefs", MODE_PRIVATE)
             val isFirstLaunchV171 = prefs.getBoolean("v171_sync_stable_final_v10", false).not()
             
             if (isFirstLaunchV171) {
@@ -90,7 +88,7 @@ class MainActivity : ComponentActivity() {
                     val map = getStationMap()
                     
                     // 3. Reprocessar histórico
-                    val allWithPosto = dao.allList().filter { it.codPosto.isNotBlank() }.reversed()
+                    val allWithPosto = dao.allList().asSequence().filter { it.codPosto.isNotBlank() }.toList().reversed()
                     
                     allWithPosto.forEach { charge ->
                         val code = charge.codPosto
@@ -119,7 +117,7 @@ class MainActivity : ComponentActivity() {
                             Spacer(modifier = Modifier.height(24.dp))
                             Text(
                                 "A sincronizar localizações oficiais...",
-                                color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp)
+                                color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp),
                             )
                             Text(
                                 "A ler base de dados de postos. Por favor aguarde.",
@@ -134,7 +132,7 @@ class MainActivity : ComponentActivity() {
                     val pagerState = rememberPagerState(initialPage = AppTab.NEW.ordinal) { AppTab.entries.size }
 
                     LaunchedEffect(pagerState.targetPage) {
-                        if (AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
+                        if ((AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress)) {
                             editingRecord = null
                         }
                     }
@@ -153,8 +151,7 @@ class MainActivity : ComponentActivity() {
                                 HorizontalPager(
                                     state = pagerState, modifier = Modifier.fillMaxSize(), userScrollEnabled = true, verticalAlignment = Alignment.Top
                                 ) { page ->
-                                    val tab = AppTab.entries[page]
-                                    when (tab) {
+                                    when (AppTab.entries[page]) {
                                         AppTab.NEW -> {
                                             AddChargeScreen(
                                                 existingCharges = charges,
@@ -162,11 +159,11 @@ class MainActivity : ComponentActivity() {
                                                 onSave = { origin, destination, odometer, chargeType, kwh, date, id, codPosto, liters, manualLocality ->
                                                     scope.launch {
                                                         var locality = manualLocality ?: ""
-                                                        if (locality.isEmpty() && codPosto.isNotBlank()) {
-                                                            if (id != null && codPosto == (editingRecord?.codPosto ?: "")) {
-                                                                locality = editingRecord?.localidade ?: ""
+                                                        if ((locality.isEmpty() && codPosto.isNotBlank())) {
+                                                            locality = if ((id != null && codPosto == (editingRecord?.codPosto ?: ""))) {
+                                                                editingRecord?.localidade ?: ""
                                                             } else {
-                                                                locality = dao.getResolvedLocalidade(codPosto) ?: ""
+                                                                dao.getResolvedLocalidade(codPosto) ?: ""
                                                             }
                                                         }
 
@@ -192,7 +189,7 @@ class MainActivity : ComponentActivity() {
                                                 onCancelEdit = {
                                                     editingRecord = null
                                                     scope.launch { pagerState.animateScrollToPage(AppTab.EDIT.ordinal) }
-                                                }
+                                                },
                                             )
                                         }
                                         AppTab.KM -> KmHistoryScreen(charges = charges)
@@ -275,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                                     scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
                                                 }
                                                 .padding(horizontal = 12.dp, vertical = 10.dp),
-                                            contentAlignment = Alignment.Center
+                                            contentAlignment = Alignment.Center,
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(tab.icon, tab.title, tint = tint, modifier = Modifier.size(20.dp))

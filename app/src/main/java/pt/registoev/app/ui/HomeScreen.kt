@@ -28,11 +28,15 @@ fun KmHistoryScreen(charges: List<EvChargeEntity>) {
     // Ordenar primeiro por Dia (ignorando hora) e depois por Odómetro para garantir coerência
     val sortedCharges = charges.sortedWith(
         compareBy<EvChargeEntity> { 
-            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
-            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = it.date
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
             cal.timeInMillis 
-        }.thenBy { it.odometer }
+        }.thenBy { it.odometer },
     )
     
     LazyColumn(
@@ -149,7 +153,10 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
 
 @Composable
 fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
-    val chargeRecords = charges.filter { it.chargeType != "Nenhum" && it.chargeType != "Combustível" }.sortedByDescending { it.odometer }
+    val chargeRecords = charges.asSequence()
+        .filter { (it.chargeType != "Nenhum" && it.chargeType != "Combustível") }
+        .sortedByDescending { it.odometer }
+        .toList()
     
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -186,7 +193,10 @@ fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
 
 @Composable
 fun FuelHistoryScreen(charges: List<EvChargeEntity>) {
-    val fuelRecords = charges.filter { it.chargeType == "Combustível" }.sortedByDescending { it.odometer }
+    val fuelRecords = charges.asSequence()
+        .filter { it.chargeType == "Combustível" }
+        .sortedByDescending { it.odometer }
+        .toList()
     
     LazyColumn(
         modifier = Modifier.fillMaxSize()

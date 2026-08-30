@@ -8,7 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,14 +51,14 @@ fun AddChargeScreen(
     var locations by remember { 
         mutableStateOf(
             sharedPrefs.getStringSet("custom_locations", setOf("Entroncamento", "Benavente"))
-                ?.toList()?.sorted() ?: listOf("Benavente", "Entroncamento")
+                ?.asSequence()?.sorted()?.toList() ?: listOf("Benavente", "Entroncamento")
         )
     }
 
     var stationCodes by remember {
-        mutableStateOf<List<String>>(
+        mutableStateOf(
             sharedPrefs.getStringSet("custom_station_codes", emptySet())
-                ?.toList()?.sorted() ?: emptyList()
+                ?.asSequence()?.sorted()?.toList() ?: emptyList<String>()
         )
     }
 
@@ -126,7 +127,7 @@ fun AddChargeScreen(
             }
             3 -> { // Passo Final: Guardar Efetivamente
                 val odoVal = odometer.toIntOrNull() ?: 0
-                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
+                val kwhVal = if ((chargeType == "Nenhum" || chargeType == "Combustível")) 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
                 val litersVal = if (chargeType == "Combustível") (liters.text.toDoubleOrNull() ?: 0.0) else null
                 
                 // Se for combustível, passamos o local manual
@@ -146,8 +147,13 @@ fun AddChargeScreen(
     val odoError = remember(odometerValue, selectedDate, otherCharges, editingRecord) {
         if (odometerValue <= 0) return@remember null
         
-        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
-        calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = selectedDate
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
         val startOfCurrentDay = calendar.timeInMillis
         calendar.add(Calendar.DAY_OF_YEAR, 1)
         val startOfNextDay = calendar.timeInMillis
@@ -156,30 +162,20 @@ fun AddChargeScreen(
             // REGRA PARA NOVO REGISTO: Validar contra histórico existente na mesma data ou datas adjacentes
             
             // 1. Limites entre dias diferentes
-            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            val maxPrevDays = otherCharges.asSequence().filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
             if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Deve ser superior aos dias anteriores ($maxPrevDays km)"
             
-            val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
+            val minNextDays = otherCharges.asSequence().filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
             if (minNextDays != null && odometerValue > minNextDays) return@remember "Deve ser inferior aos dias seguintes ($minNextDays km)"
 
             // 2. Limites no próprio dia (caso esteja a inserir um registo com data retroativa para hoje)
-            val sameDayCharges = otherCharges.filter { it.date in startOfCurrentDay until startOfNextDay }
+            val sameDayCharges = otherCharges.asSequence().filter { (it.date in startOfCurrentDay until startOfNextDay) }.toList()
             if (sameDayCharges.isNotEmpty()) {
-                // Como é novo, assumimos que se insere no fim da lista do dia (ou no meio se houver km maiores)
-                val maxSameDayBelow = sameDayCharges.filter { it.odometer < odometerValue }.maxOfOrNull { it.odometer }
-                val minSameDayAbove = sameDayCharges.filter { it.odometer > odometerValue }.minOfOrNull { it.odometer }
-                
-                // Validação lógica: se estamos a tentar inserir um valor que "atropela" a ordem crescente
-                val hasHigherKmToday = sameDayCharges.any { it.odometer >= odometerValue && it.date <= selectedDate }
-                val hasLowerKmToday = sameDayCharges.any { it.odometer <= odometerValue && it.date >= selectedDate }
-                
                 // Simplificação: o valor deve apenas encaixar na sequência crescente global
                 val absoluteMax = otherCharges.maxOfOrNull { it.odometer } ?: 0
                 if (selectedDate >= System.currentTimeMillis() - 60000 && odometerValue <= absoluteMax) {
                     return@remember "Deve ser superior ao último registo: $absoluteMax km"
                 }
-            } else {
-                // Sem registos no dia, basta ser maior que o passado e menor que o futuro
             }
         } else {
             // REGRA PARA EDIÇÃO: Validação cronológica detalhada (já implementada)
@@ -331,9 +327,19 @@ fun AddChargeScreen(
             Text("TRAJETO", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
             IOSRowCard {
                 Column {
-                    CompactInputField(label = "Origem", value = origin, onValueChange = { origin = it }, suggestions = locations, onLongPress = { pendingLocationToDelete = it })
+                    CompactInputField(
+                        label = "Origem",
+                        value = origin,
+                        onValueChange = { origin = it },
+                        suggestions = locations
+                    ) { pendingLocationToDelete = it }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.05f))
-                    CompactInputField(label = "Destino", value = destination, onValueChange = { destination = it }, suggestions = locations, onLongPress = { pendingLocationToDelete = it })
+                    CompactInputField(
+                        label = "Destino",
+                        value = destination,
+                        onValueChange = { destination = it },
+                        suggestions = locations
+                    ) { pendingLocationToDelete = it }
                 }
             }
         }
@@ -360,7 +366,9 @@ fun AddChargeScreen(
                     Text("km", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
                 }
             }
-            if (odoError != null) Text(text = odoError, color = Color(0xFFE53935), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            odoError?.let {
+                Text(text = it, color = Color(0xFFE53935), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            }
         }
 
         // --- CARREGAMENTO ---
@@ -507,7 +515,9 @@ fun AddChargeScreen(
                  (chargeType == "Combustível" && liters.text.isNotBlank() && fuelLocation.isNotBlank()) || 
                  (chargeType != "Combustível" && kwh.text.isNotBlank()))
         Button(
-            onClick = { checkAndSave(0) },
+            onClick = {
+                checkAndSave(0)
+            },
             modifier = Modifier.fillMaxWidth().height(52.dp), enabled = isFormValid,
             colors = ButtonDefaults.buttonColors(containerColor = if (isFormValid) Color(0xFF4CAF50) else Color.White, contentColor = if (isFormValid) Color.White else Color.Black, disabledContainerColor = Color.White.copy(alpha = 0.1f), disabledContentColor = Color.DarkGray),
             shape = RoundedCornerShape(12.dp)
@@ -534,10 +544,13 @@ fun CompactInputField(label: String, value: String, onValueChange: (String) -> U
         Row(modifier = Modifier.padding(top = 2.dp, start = 70.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             suggestions.forEach { loc ->
                 val isSelected = value == loc
-                Text(text = loc, color = if (isSelected) Color.Black else Color.LightGray, fontSize = 12.sp,
+                Text(
+                    text = loc,
+                    color = if (isSelected) Color.Black else Color.LightGray,
+                    fontSize = 12.sp,
                     modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(if (isSelected) Color.White else Color.White.copy(alpha = 0.08f))
                         .combinedClickable(onClick = { onValueChange(loc) }, onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongPress(loc) })
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
         }

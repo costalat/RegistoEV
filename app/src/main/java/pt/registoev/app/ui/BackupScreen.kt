@@ -34,6 +34,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import pt.registoev.app.data.EvChargeEntity
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -218,7 +222,6 @@ fun BackupScreen(
                 if (selectedExportType == "Carregamentos") {
                     pdfBaseCalendar = cal
                     pdfChargesToExport = filterChargesForPeriod(charges, "Mês", cal)
-                    // Não lançamos logo o launcher, deixamos o utilizador escolher CSV ou PDF Oficial no Step 3
                 } else {
                     csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Mês", cal)
                     pendingFileName = "export_${selectedExportType!!.lowercase()}_mes_${year}_${month + 1}.csv"
@@ -292,7 +295,7 @@ fun BackupScreen(
                         listOf("Movimentos", "Carregamentos").forEach { type ->
                             FilterChip(
                                 selected = selectedExportType == type,
-                                onClick = { selectedExportType = type; selectedExportPeriodType = null },
+                                onClick = { selectedExportType = type; selectedExportPeriodType = null; pdfBaseCalendar = null },
                                 label = { Text(type) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color.White,
@@ -655,9 +658,9 @@ fun exportMonthlyReportToPdf(
 
         // --- 4. TABELA ---
         val tableTop = currentY
-        val colWidths = floatArrayOf(75f, 80f, 45f, 60f, 90f, 75f, 90f)
-        val headers = arrayOf("Data de", "Tipologia de", "KW", "Km da", "Nome/Código", "Localidade", "Condutor")
-        val headers2 = arrayOf("carregamento", "Carregamento", "abastecidos", "viatura", "Posto", "", "")
+        val colWidths = floatArrayOf(75f, 60f, 45f, 55f, 80f, 85f, 90f)
+        val headers = arrayOf("Data", "Tipo carreg", "KW", "Km", "Código posto", "Localidade", "Condutor")
+        val headers2 = arrayOf("", "", "abast", "", "", "", "")
         
         var currentX = margin
         val rowHeight = 25f
@@ -692,12 +695,14 @@ fun exportMonthlyReportToPdf(
                 String.format(Locale.US, "%.1f", charge.kwh),
                 charge.odometer.toString(),
                 charge.codPosto,
-                "", 
+                charge.localidade, 
                 condutor
             )
 
             for (j in rowData.indices) {
-                canvas.drawText(rowData[j], currentX + 5f, y + 18f, textPaint)
+                val maxWidth = colWidths[j] - 8f
+                val displayText = truncateText(rowData[j], textPaint, maxWidth)
+                canvas.drawText(displayText, currentX + 5f, y + 18f, textPaint)
                 canvas.drawLine(currentX, y, currentX, y + rowHeight, textPaint)
                 currentX += colWidths[j]
             }
@@ -743,6 +748,21 @@ fun exportMonthlyReportToPdf(
     }
 }
 
+private fun truncateText(text: String, paint: Paint, maxWidth: Float): String {
+    if (paint.measureText(text) <= maxWidth) return text
+    
+    val ellipsis = "..."
+    val ellipsisWidth = paint.measureText(ellipsis)
+    
+    if (ellipsisWidth > maxWidth) return ""
+    
+    var truncated = text
+    while (truncated.isNotEmpty() && paint.measureText(truncated + ellipsis) > maxWidth) {
+        truncated = truncated.substring(0, truncated.length - 1)
+    }
+    return truncated + ellipsis
+}
+
 fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType: String, calendar: Calendar): String {
     val startTime: Long
     val endTime: Long
@@ -750,15 +770,9 @@ fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType
     val baseCal = calendar.clone() as Calendar
     when (periodType) {
         "Semana" -> {
-            // Ajustar explicitamente para o Domingo anterior (00:00:00)
             baseCal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
-            baseCal.set(Calendar.HOUR_OF_DAY, 0)
-            baseCal.set(Calendar.MINUTE, 0)
-            baseCal.set(Calendar.SECOND, 0)
-            baseCal.set(Calendar.MILLISECOND, 0)
+            baseCal.set(Calendar.HOUR_OF_DAY, 0); baseCal.set(Calendar.MINUTE, 0); baseCal.set(Calendar.SECOND, 0); baseCal.set(Calendar.MILLISECOND, 0)
             startTime = baseCal.timeInMillis
-            
-            // Adicionar 7 dias para chegar ao próximo Domingo (exclui o início do próximo Domingo)
             baseCal.add(Calendar.DAY_OF_YEAR, 7)
             endTime = baseCal.timeInMillis
         }
@@ -784,14 +798,14 @@ fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType
     val df = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     if (type == "Movimentos") {
-        sb.append("Data;Origem;Destino;Odometer\n")
+        sb.append("Data;Origem;Destino;Localidade;Odometer\n")
         filtered.sortedBy { it.date }.forEach {
-            sb.append("${df.format(Date(it.date))};${it.origin};${it.destination};${it.odometer}\n")
+            sb.append("${df.format(Date(it.date))};${it.origin};${it.destination};${it.localidade};${it.odometer}\n")
         }
     } else {
-        sb.append("Data;Local;Tipo Carga;Cod. Posto;kWh\n")
+        sb.append("Data;Localidade;Tipo Carga;Cod. Posto;kWh\n")
         filtered.filter { it.chargeType != "Nenhum" }.sortedBy { it.date }.forEach {
-            sb.append("${df.format(Date(it.date))};${it.destination};${it.chargeType};${it.codPosto};${it.kwh}\n")
+            sb.append("${df.format(Date(it.date))};${it.localidade};${it.chargeType};${it.codPosto};${it.kwh}\n")
         }
     }
     return sb.toString()
@@ -818,7 +832,8 @@ fun parseJsonBackup(json: String): List<EvChargeEntity> {
             chargeType = if (obj.has("tipoCarga")) obj.getString("tipoCarga") else obj.optString("chargeType", "Nenhum"),
             kwh = if (obj.has("kw")) obj.getDouble("kw") else obj.optDouble("kwh", 0.0),
             date = dateValue,
-            codPosto = if (obj.has("codPosto")) obj.getString("codPosto") else obj.optString("stationCode", "")
+            codPosto = if (obj.has("codPosto")) obj.getString("codPosto") else obj.optString("stationCode", ""),
+            localidade = if (obj.has("localidade")) obj.getString("localidade") else obj.optString("location", "")
         ))
     }
     return result
@@ -837,6 +852,7 @@ fun exportRecordsToJson(charges: List<EvChargeEntity>): String {
         obj.put("kw", charge.kwh)
         obj.put("tipoCarga", charge.chargeType)
         obj.put("codPosto", charge.codPosto)
+        obj.put("localidade", charge.localidade)
         array.put(obj)
     }
     return array.toString(2)

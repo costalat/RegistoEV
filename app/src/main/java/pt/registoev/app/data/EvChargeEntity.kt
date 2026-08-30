@@ -12,5 +12,6 @@ data class EvChargeEntity(
  val chargeType: String,
  val kwh: Double,
  val date: Long,
- val codPosto: String = ""
+ val codPosto: String = "",
+ val localidade: String = ""
 )

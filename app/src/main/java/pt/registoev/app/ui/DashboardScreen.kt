@@ -44,9 +44,9 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
         LaunchedEffect(dateRangePickerState.selectedStartDateMillis) {
             dateRangePickerState.selectedStartDateMillis?.let { start ->
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = start }
-                // ISO 8601: Segunda-feira como primeiro dia
+                // Semana começa à Sexta-feira e termina na Quinta-feira seguinte
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -54,12 +54,12 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 
-                val monday = cal.timeInMillis
+                val friday = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val sunday = cal.timeInMillis
+                val thursday = cal.timeInMillis
                 
-                if (dateRangePickerState.selectedStartDateMillis != monday || dateRangePickerState.selectedEndDateMillis != sunday) {
-                    dateRangePickerState.setSelection(monday, sunday)
+                if (dateRangePickerState.selectedStartDateMillis != friday || dateRangePickerState.selectedEndDateMillis != thursday) {
+                    dateRangePickerState.setSelection(friday, thursday)
                 }
             }
         }
@@ -117,9 +117,9 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
         
         when (selectedPeriodType) {
             HistoryPeriod.WEEK -> {
-                // ISO 8601: Segunda-feira como primeiro dia da semana
+                // Semana começa à Sexta-feira
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 startTime = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 7)
@@ -265,9 +265,9 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
         LaunchedEffect(dateRangePickerState.selectedStartDateMillis) {
             dateRangePickerState.selectedStartDateMillis?.let { start ->
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = start }
-                // ISO 8601: Segunda-feira como primeiro dia
+                // Semana começa à Sexta-feira e termina na Quinta-feira seguinte
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -275,12 +275,12 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 
-                val monday = cal.timeInMillis
+                val friday = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val sunday = cal.timeInMillis
+                val thursday = cal.timeInMillis
                 
-                if (dateRangePickerState.selectedStartDateMillis != monday || dateRangePickerState.selectedEndDateMillis != sunday) {
-                    dateRangePickerState.setSelection(monday, sunday)
+                if (dateRangePickerState.selectedStartDateMillis != friday || dateRangePickerState.selectedEndDateMillis != thursday) {
+                    dateRangePickerState.setSelection(friday, thursday)
                 }
             }
         }
@@ -338,9 +338,9 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
 
         when (selectedPeriodType) {
             HistoryPeriod.WEEK -> {
-                // ISO 8601: Segunda-feira como primeiro dia da semana
+                // Semana começa à Sexta-feira
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 startTime = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 7)

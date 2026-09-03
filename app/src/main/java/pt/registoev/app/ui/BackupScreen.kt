@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -32,8 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import pt.registoev.app.data.EvChargeEntity
+import pt.registoev.app.sync.CloudSyncManager
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
@@ -361,6 +365,65 @@ fun BackupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Cancelar", color = Color.DarkGray)
+                    }
+                }
+            }
+        }
+
+        // --- SECÇÃO NUVEM (GOOGLE SHEETS) ---
+        var isSyncing by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+            shape = RoundedCornerShape(24.dp),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF4CAF50).copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.CloudSync, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Sincronização Cloud", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Sincronize todo o seu histórico local com o Google Sheets.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = {
+                        val prefs = ctx.getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE)
+                        val vehiclePlate = prefs.getString("vehicle_plate", "") ?: ""
+                        val driverName = prefs.getString("driver_name", "") ?: ""
+                        
+                        scope.launch {
+                            isSyncing = true
+                            charges.forEach { charge ->
+                                CloudSyncManager.syncRecord(charge, vehiclePlate, driverName)
+                                delay(200L) // Evitar rate limiting do script do Google
+                            }
+                            isSyncing = false
+                            Toast.makeText(ctx, "Sincronização concluída!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSyncing,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2196F3),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Sincronizar Histórico Agora", fontWeight = FontWeight.Bold)
                     }
                 }
             }

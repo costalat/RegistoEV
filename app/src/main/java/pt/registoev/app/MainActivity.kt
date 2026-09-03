@@ -8,10 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import pt.registoev.app.data.AppDatabase
 import pt.registoev.app.data.EvChargeEntity
+import pt.registoev.app.sync.CloudSyncManager
 import pt.registoev.app.ui.*
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -130,10 +133,16 @@ class MainActivity : ComponentActivity() {
                     val charges by dao.all().collectAsState(initial = emptyList())
                     val scope = rememberCoroutineScope()
                     val pagerState = rememberPagerState(initialPage = AppTab.NEW.ordinal) { AppTab.entries.size }
+                    val navScrollState = rememberScrollState()
 
                     LaunchedEffect(pagerState.targetPage) {
                         if ((AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress)) {
                             editingRecord = null
+                        }
+                        // Auto-scroll da barra de navegação para manter o item visível
+                        if (navScrollState.maxValue > 0) {
+                            val targetScroll = (navScrollState.maxValue.toFloat() * (pagerState.targetPage.toFloat() / (AppTab.entries.size - 1))).toInt()
+                            navScrollState.animateScrollTo(targetScroll)
                         }
                     }
 
@@ -172,7 +181,21 @@ class MainActivity : ComponentActivity() {
                                                             odometer = odometer, chargeType = chargeType, kwh = kwh, date = date,
                                                             codPosto = codPosto, localidade = locality, liters = liters
                                                         )
-                                                        dao.insert(entity)
+                                                        val savedId = dao.insert(entity)
+                                                        
+                                                        // Sincronização Cloud (Silenciosa)
+                                                        val entityToSync = if (id == null) entity.copy(id = savedId) else entity
+                                                        
+                                                        // IMPORTANTE: Ler do ficheiro de preferências correto e forçar sincronização
+                                                        val prefs = this@MainActivity.getSharedPreferences("registoev_prefs", MODE_PRIVATE)
+                                                        val vehiclePlate = prefs.getString("vehicle_plate", "") ?: ""
+                                                        val driverName = prefs.getString("driver_name", "") ?: ""
+                                                        
+                                                        android.util.Log.d("RegistoEV_Sync", "A carregar para Cloud -> Matrícula: $vehiclePlate | Condutor: $driverName")
+                                                        
+                                                        scope.launch(Dispatchers.IO) {
+                                                            CloudSyncManager.syncRecord(entityToSync, vehiclePlate, driverName)
+                                                        }
                                                         
                                                         // Trigger API silenciosa se for código novo
                                                         if (codPosto.isNotBlank() && locality.isEmpty()) {
@@ -203,7 +226,15 @@ class MainActivity : ComponentActivity() {
                                                     scope.launch { pagerState.animateScrollToPage(AppTab.NEW.ordinal) }
                                                 },
                                                 onDeleteSelected = { ids ->
-                                                    scope.launch { dao.deleteByIds(ids) }
+                                                    scope.launch { 
+                                                        dao.deleteByIds(ids)
+                                                        // Sincronização Cloud (Eliminar)
+                                                        scope.launch(Dispatchers.IO) {
+                                                            ids.forEach { id ->
+                                                                CloudSyncManager.deleteRecord(id)
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             )
                                         }
@@ -249,14 +280,20 @@ class MainActivity : ComponentActivity() {
 
                             // BARRA DE NAVEGAÇÃO
                             Surface(
-                                modifier = Modifier.padding(bottom = 32.dp).align(Alignment.BottomCenter).padding(horizontal = 8.dp),
+                                modifier = Modifier
+                                    .padding(bottom = 32.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = 8.dp)
+                                    .widthIn(max = 600.dp), // Limitar largura máxima para tablets
                                 shape = RoundedCornerShape(28.dp),
                                 color = Color(0xFF1E1E1E).copy(alpha = 0.95f),
                                 shadowElevation = 12.dp,
                                 border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                                        .horizontalScroll(navScrollState), // Adicionado scroll horizontal
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {

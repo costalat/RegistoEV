@@ -65,7 +65,7 @@ fun AboutScreen() {
         )
         
         Text(
-            text = "Versão 1.7",
+            text = "Versão 1.8.1",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray
         )
@@ -156,6 +156,32 @@ fun AboutScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
         
+        // Changelog Card (NEW)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "NOVIDADES V1.8.1",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                ChangelogItem("Nuvem", "Sincronização automática e edição com Google Sheets.")
+                ChangelogItem("Combustível", "Novo suporte para litros e local de abastecimento.")
+                ChangelogItem("Interface", "Novo design premium, ícones 3D e navegação fluida.")
+                ChangelogItem("Relatórios", "PDFs melhorados com proteção de colunas.")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
         // Credits Section
         Text(
             text = "EQUIPA DE DESENVOLVIMENTO",
@@ -193,6 +219,34 @@ fun AboutScreen() {
 fun AboutScreenPreview() {
     MaterialTheme {
         AboutScreen()
+    }
+}
+
+@Composable
+fun ChangelogItem(tag: String, text: String) {
+    Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            color = Color(0xFF2196F3).copy(alpha = 0.1f),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Text(
+                text = tag,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF2196F3),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.LightGray,
+            lineHeight = 18.sp
+        )
     }
 }
 

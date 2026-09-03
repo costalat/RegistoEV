@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 private val AppBlue = Color(0xFF2196F3)      // Azul Azure
 private val AppGreen = Color(0xFF4CAF50)     // Verde Elétrico (estilo Splash)
 private val AppBlack = Color(0xFF000000)     // Preto Puro
+@Suppress("unused")
 private val AppLeadGrey = Color(0xFF121212)  // Cinza Chumbo
 private val AppSurface = Color(0xFF1E1E1E)   // Cinza para Cartões
 
@@ -23,27 +24,28 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = Color.White,
     onSurface = Color.White,
     primaryContainer = AppBlue.copy(alpha = 0.2f),
-    onPrimaryContainer = AppBlue
+    onPrimaryContainer = AppBlue,
 )
 
 // Mantemos o LightColorScheme apenas por compatibilidade, mas o foco é o Dark
+@Suppress("unused")
 private val LightColorScheme = lightColorScheme(
     primary = AppBlue,
     secondary = AppGreen,
     background = Color.White,
-    surface = Color(0xFFF5F5F5)
+    surface = Color(0xFFF5F5F5),
 )
 
 @Composable
 fun RegistoEVTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
+    @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
 ) {
     // Forçamos o modo escuro para garantir a nova estética "Deep Dark"
     val colorScheme = DarkColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content
+        content = content,
     )
 }

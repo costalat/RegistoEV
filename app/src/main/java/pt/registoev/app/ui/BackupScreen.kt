@@ -1,7 +1,6 @@
 package pt.registoev.app.ui
 
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
@@ -30,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -38,28 +36,24 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import pt.registoev.app.data.EvChargeEntity
 import pt.registoev.app.sync.CloudSyncManager
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BackupScreen(
-    onImport: (List<EvChargeEntity>) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onImport: (List<EvChargeEntity>) -> Unit,
     onExportToFile: (Uri) -> Unit,
     onImportFromFile: (Uri) -> Unit,
     charges: List<EvChargeEntity>,
-    onExportCsv: (Uri, String) -> Unit
+    onExportCsv: (Uri, String) -> Unit,
 ) {
     val ctx = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
-    var isError by remember { mutableStateOf(false) }
+    var isError by remember { mutableStateOf(value = false) }
 
     // State for CSV Export Workflow
-    var showExportOptions by remember { mutableStateOf(false) }
+    var showExportOptions by remember { mutableStateOf(value = false) }
     var selectedExportType by remember { mutableStateOf<String?>(null) } // "Movimentos" or "Carregamentos"
     var selectedExportPeriodType by remember { mutableStateOf<String?>(null) } // "Semana", "Mês", "Ano"
     
@@ -76,7 +70,7 @@ fun BackupScreen(
     var pdfChargesToExport by remember { mutableStateOf<List<EvChargeEntity>>(emptyList()) }
 
     val csvLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
+        contract = ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri ->
         if (uri != null) {
             onExportCsv(uri, csvContentToExport)
@@ -179,7 +173,7 @@ fun BackupScreen(
                         val year = cal.get(Calendar.YEAR)
                         
                         csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Semana", cal)
-                        pendingFileName = "export_${selectedExportType!!.lowercase()}_semana_${weekNum}_${year}.csv"
+                        pendingFileName = "export_${selectedExportType!!.lowercase()}_semana_${weekNum}_$year.csv"
                         csvLauncher.launch(pendingFileName)
                     }
                     showDatePicker = false
@@ -342,7 +336,7 @@ fun BackupScreen(
                                     Button(
                                         onClick = { 
                                             val monthYear = SimpleDateFormat("MM_yyyy", Locale.getDefault()).format(pdfBaseCalendar!!.time)
-                                            pdfLauncher.launch("reporte_mensal_${monthYear}.pdf") 
+                                            pdfLauncher.launch("reporte_mensal_$monthYear.pdf") 
                                         },
                                         modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
@@ -647,7 +641,7 @@ fun filterChargesForPeriod(charges: List<EvChargeEntity>, periodType: String, ca
         }
         else -> { startTime = 0; endTime = Long.MAX_VALUE }
     }
-    return charges.filter { it.date in startTime until endTime }.sortedBy { it.date }
+    return charges.asSequence().filter { it.date in startTime until endTime }.sortedBy { it.date }.toList()
 }
 
 fun exportMonthlyReportToPdf(
@@ -663,7 +657,7 @@ fun exportMonthlyReportToPdf(
     val modelo = prefs.getString("vehicle_model", "") ?: ""
     val matricula = prefs.getString("vehicle_plate", "") ?: ""
 
-    val reportMonth = SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(calendar.time).uppercase()
+    val reportMonth = SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("pt-PT")).format(calendar.time).uppercase()
     val pdfDocument = PdfDocument()
     val textPaint = Paint().apply { textSize = 10f; isAntiAlias = true }
     val titlePaint = Paint().apply { 

@@ -27,11 +27,11 @@ import java.util.*
 fun EditHistoryScreen(
     charges: List<EvChargeEntity>,
     onEditClick: (EvChargeEntity) -> Unit,
-    onDeleteSelected: (List<Long>) -> Unit
+    onDeleteSelected: (List<Long>) -> Unit,
 ) {
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
-    var isSelectionMode by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var isSelectionMode by remember { mutableStateOf(value = false) }
+    var showDeleteConfirm by remember { mutableStateOf(value = false) }
 
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
@@ -39,10 +39,12 @@ fun EditHistoryScreen(
         charges.sortedWith(
             compareByDescending<EvChargeEntity> { 
                 val cal = Calendar.getInstance().apply { timeInMillis = it.date }
-                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 cal.timeInMillis 
-            }.thenByDescending { it.odometer }
+            }.thenByDescending { it.odometer },
         )
     }
 
@@ -92,7 +94,7 @@ fun EditHistoryScreen(
 
                         Row {
                             IconButton(onClick = { 
-                                selectedIds = if (selectedIds.size == charges.size) emptySet() else charges.map { it.id }.toSet()
+                                selectedIds = if (selectedIds.size == charges.size) emptySet() else charges.asSequence().map { it.id }.toSet()
                             }) {
                                 Icon(Icons.Default.SelectAll, null, tint = Color.White)
                             }
@@ -258,7 +260,7 @@ fun EditCard(
                 ) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "${charge.odometer}",
+                            text = charge.odometer.toString(),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
                             color = Color.White,

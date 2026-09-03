@@ -35,7 +35,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 import org.json.JSONObject
 import pt.registoev.app.data.AppDatabase
 import pt.registoev.app.data.EvChargeEntity
@@ -47,7 +46,6 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.*
 
 enum class AppTab(val title: String, val icon: ImageVector) {
     NEW("Novo", Icons.Default.Add),
@@ -72,7 +70,7 @@ class MainActivity : ComponentActivity() {
         val db = AppDatabase.get(this)
         val dao = db.dao()
 
-        var isUpdatingData by mutableStateOf(false)
+        var isUpdatingData by mutableStateOf(value = false)
 
         // Lógica de Sincronização Inicial V1.7.1 (Mapa em Memória)
         lifecycleScope.launch(Dispatchers.IO) {
@@ -98,7 +96,7 @@ class MainActivity : ComponentActivity() {
                         val alreadyResolved = dao.getResolvedLocalidade(code)
                         if (alreadyResolved.isNullOrEmpty()) {
                             resolveAndSaveWithMap(this@MainActivity, code, map, dao)
-                            delay(3000) // Pausa Nominatim (Aumentada para 3s para evitar bloqueio)
+                            delay(3000L) // Pausa Nominatim (Aumentada para 3s para evitar bloqueio)
                         }
                     }
                     prefs.edit { putBoolean("v171_sync_stable_final_v10", true) }
@@ -124,7 +122,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Text(
                                 "A ler base de dados de postos. Por favor aguarde.",
-                                color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)
+                                color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp),
                             )
                         }
                     }
@@ -136,7 +134,7 @@ class MainActivity : ComponentActivity() {
                     val navScrollState = rememberScrollState()
 
                     LaunchedEffect(pagerState.targetPage) {
-                        if ((AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress)) {
+                        if (AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
                             editingRecord = null
                         }
                         // Auto-scroll da barra de navegação para manter o item visível
@@ -151,7 +149,7 @@ class MainActivity : ComponentActivity() {
                         topBar = {
                             TopAppBar(
                                 title = { Text(AppTab.entries[pagerState.targetPage].title) },
-                                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White)
+                                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White),
                             )
                         }
                     ) { padding ->
@@ -357,31 +355,34 @@ class MainActivity : ComponentActivity() {
 }
 
 suspend fun resolveAndSaveWithMap(context: Context, stationCode: String, map: Map<String, Pair<Double, Double>>, dao: pt.registoev.app.data.EvDao) {
-    try {
-        val coords = map[stationCode.lowercase()]
-        if (coords != null) {
-            val nominatimUrl = "https://nominatim.openstreetmap.org/reverse?lat=${coords.first}&lon=${coords.second}&format=json"
-            val conn = URL(nominatimUrl).openConnection() as HttpURLConnection
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-            conn.connectTimeout = 15000
-            conn.readTimeout = 15000
-            
-            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                val response = conn.inputStream.bufferedReader().use { it.readText() }
-                val address = JSONObject(response).optJSONObject("address")
-                val localidade = listOf("city", "town", "village", "suburb", "hamlet", "municipality")
-                    .map { address?.optString(it, "") ?: "" }
-                    .firstOrNull { it.isNotBlank() } ?: ""
+    kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val coords = map[stationCode.lowercase()]
+            if (coords != null) {
+                val nominatimUrl = "https://nominatim.openstreetmap.org/reverse?lat=${coords.first}&lon=${coords.second}&format=json"
+                val conn = URL(nominatimUrl).openConnection() as HttpURLConnection
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                conn.connectTimeout = 15000
+                conn.readTimeout = 15000
                 
-                if (localidade.isNotBlank()) {
-                    dao.updateLocalidadeByStationCode(stationCode, localidade)
-                    (context as? android.app.Activity)?.runOnUiThread {
-                        Toast.makeText(context, "Resolvido: $localidade", Toast.LENGTH_SHORT).show()
+                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = conn.inputStream.bufferedReader().use { it.readText() }
+                    val address = JSONObject(response).optJSONObject("address")
+                    val localidade = listOf("city", "town", "village", "suburb", "hamlet", "municipality")
+                        .asSequence()
+                        .map { address?.optString(it, "") ?: "" }
+                        .firstOrNull { it.isNotBlank() } ?: ""
+                    
+                    if (localidade.isNotBlank()) {
+                        dao.updateLocalidadeByStationCode(stationCode, localidade)
+                        (context as? android.app.Activity)?.runOnUiThread {
+                            Toast.makeText(context, "Resolvido: $localidade", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
+        } catch (e: Exception) {
+            android.util.Log.e("RegistoEV", "Erro ao resolver $stationCode: ${e.message}")
         }
-    } catch (e: Exception) {
-        android.util.Log.e("RegistoEV", "Erro ao resolver $stationCode: ${e.message}")
     }
 }

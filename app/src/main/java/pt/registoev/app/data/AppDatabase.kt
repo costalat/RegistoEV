@@ -29,7 +29,7 @@ abstract class AppDatabase: RoomDatabase() {
 
   fun get(ctx: Context) = Room.databaseBuilder(ctx, AppDatabase::class.java, "ev.db")
       .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-      .fallbackToDestructiveMigrationOnDowngrade(true)
+      .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
       .build()
  }
 }

@@ -40,7 +40,7 @@ fun KmHistoryScreen(charges: List<EvChargeEntity>) {
     )
     
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         item {
             DashboardSection(charges = charges)
@@ -106,13 +106,38 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    if (charge.localidade.isNotBlank()) {
-                        Text(
-                            text = charge.localidade,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF2196F3),
-                            fontWeight = FontWeight.Bold
-                        )
+                    val hasAbastecimento = charge.chargeType != "Nenhum"
+                    val displayText = if (charge.localidade.isNotBlank()) charge.localidade else if (hasAbastecimento) charge.chargeType else ""
+
+                    if (displayText.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            val iconInfo = when (charge.chargeType) {
+                                "Combustível" -> Icons.Default.LocalGasStation to Color(0xFFFFB300)
+                                "Portátil" -> Icons.Default.Bolt to Color(0xFFFFB300)
+                                "Rede MOBI.E" -> Icons.Default.Bolt to Color(0xFF26C6DA)
+                                "Rede VOLTE.E" -> Icons.Default.Bolt to Color(0xFF046A38)
+                                else -> if (hasAbastecimento) Icons.Default.Bolt to Color(0xFF2196F3) else null
+                            }
+                            iconInfo?.let { (icon, tint) ->
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = tint,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            val labelColor = if (charge.chargeType == "Combustível") Color(0xFFFFB300) else Color(0xFF2196F3)
+                            Text(
+                                text = displayText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = labelColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 
@@ -154,7 +179,7 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
 @Composable
 fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
     val chargeRecords = charges.asSequence()
-        .filter { (it.chargeType != "Nenhum" && it.chargeType != "Combustível") }
+        .filter { it.chargeType != "Nenhum" && it.chargeType != "Combustível" }
         .sortedByDescending { it.odometer }
         .toList()
     
@@ -394,7 +419,7 @@ fun ChargeHistoryItem(charge: EvChargeEntity) {
                         )
                     }
 
-                    // Badge: Código do Posto (Independente - Design Identêntico)
+                    // Badge: Código do Posto (Independente - Design Idêntico)
                     if (charge.codPosto.isNotEmpty()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

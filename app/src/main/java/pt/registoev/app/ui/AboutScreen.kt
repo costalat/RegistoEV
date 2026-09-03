@@ -1,7 +1,6 @@
 package pt.registoev.app.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,13 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -41,7 +34,7 @@ fun AboutScreen() {
             .background(Color.Black)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(1.dp))
         
@@ -52,7 +45,7 @@ fun AboutScreen() {
             contentDescription = "Registo EV Logo",
             modifier = Modifier
                 .size(160.dp) // Tamanho ajustado para visibilidade
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(28.dp)),
         )
         
         Spacer(modifier = Modifier.height(8.dp))

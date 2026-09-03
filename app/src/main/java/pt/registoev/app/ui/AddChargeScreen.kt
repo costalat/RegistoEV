@@ -8,8 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,7 +49,7 @@ fun AddChargeScreen(
     var locations by remember { 
         mutableStateOf(
             sharedPrefs.getStringSet("custom_locations", setOf("Entroncamento", "Benavente"))
-                ?.asSequence()?.sorted()?.toList() ?: listOf("Benavente", "Entroncamento")
+                ?.asSequence()?.sorted()?.toList() ?: listOf("Benavente", "Entroncamento"),
         )
     }
 
@@ -76,7 +74,7 @@ fun AddChargeScreen(
     var selectedDate by remember(editId) { mutableLongStateOf(editingRecord?.date ?: System.currentTimeMillis()) }
     
     var showDatePicker by remember { mutableStateOf(value = false) }
-    val dateFormatter = remember { SimpleDateFormat("dd MMMM yyyy", Locale("pt", "PT")) }
+    val dateFormatter = remember { SimpleDateFormat("dd MMMM yyyy", Locale.forLanguageTag("pt-PT")) }
 
     val odometerFocusRequester = remember { FocusRequester() }
     val kwhFocusRequester = remember { FocusRequester() }
@@ -127,7 +125,7 @@ fun AddChargeScreen(
             }
             3 -> { // Passo Final: Guardar Efetivamente
                 val odoVal = odometer.toIntOrNull() ?: 0
-                val kwhVal = if ((chargeType == "Nenhum" || chargeType == "Combustível")) 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
+                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
                 val litersVal = if (chargeType == "Combustível") (liters.text.toDoubleOrNull() ?: 0.0) else null
                 
                 // Se for combustível, passamos o local manual
@@ -179,7 +177,7 @@ fun AddChargeScreen(
             }
         } else {
             // REGRA PARA EDIÇÃO: Validação cronológica detalhada (já implementada)
-            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            val maxPrevDays = otherCharges.asSequence().filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
             if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Mínimo permitido (dias anteriores): $maxPrevDays km"
             
             val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }

@@ -8,6 +8,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import pt.registoev.app.data.EvChargeEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object CloudSyncManager {
@@ -25,26 +28,50 @@ object CloudSyncManager {
 
     /**
      * Envia um registo para o Google Sheets com dados extras de perfil.
+     * Inclui mapeamento duplo de chaves (Inglês e Português) para garantir
+     * compatibilidade com o Google Apps Script.
      */
     suspend fun syncRecord(
         charge: EvChargeEntity,
         plate: String = "",
-        driver: String = ""
+        driver: String = "",
     ): Boolean = withContext(Dispatchers.IO) {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        val formattedDate = dateFormat.format(Date(charge.date))
+
         val payload = mapOf(
             "id" to charge.id,
+            // Mapeamento duplo para Origem
             "origin" to charge.origin,
+            "origem" to charge.origin,
+            // Mapeamento duplo para Destino
             "destination" to charge.destination,
+            "destino" to charge.destination,
+            // Mapeamento duplo para Odómetro
             "odometer" to charge.odometer,
+            "odometro" to charge.odometer,
+            "odo" to charge.odometer,
+            // Tipo de Carga / Combustível
             "chargeType" to charge.chargeType,
+            "tipoCarga" to charge.chargeType,
+            // kWh e Litros
             "kwh" to charge.kwh,
+            "kw" to charge.kwh,
+            "liters" to (charge.liters ?: 0.0),
+            "litros" to (charge.liters ?: 0.0),
+            // Data
             "date" to charge.date,
+            "data" to formattedDate,
+            // Estação e Localidade
             "codPosto" to charge.codPosto,
             "localidade" to charge.localidade,
-            "liters" to (charge.liters ?: 0.0),
+            // Perfil
             "plate" to plate,
+            "matricula" to plate,
             "driver" to driver,
-            "action" to "SAVE"
+            "condutor" to driver,
+            // Ação
+            "action" to "SAVE",
         )
         
         val json = gson.toJson(payload)
@@ -78,7 +105,7 @@ object CloudSyncManager {
     suspend fun deleteRecord(id: Long): Boolean = withContext(Dispatchers.IO) {
         val payload = mapOf(
             "id" to id,
-            "action" to "DELETE"
+            "action" to "DELETE",
         )
         
         val json = gson.toJson(payload)

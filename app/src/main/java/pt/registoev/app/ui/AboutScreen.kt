@@ -16,9 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,11 +51,11 @@ fun AboutScreen() {
             text = "Registo EV",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
         
         Text(
-            text = "Versão 1.8.1",
+            text = "Versão 1.8.2",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray
         )
@@ -158,7 +155,7 @@ fun AboutScreen() {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "NOVIDADES V1.8.1",
+                    text = "NOVIDADES V1.8.2",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
                     letterSpacing = 1.sp,

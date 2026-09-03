@@ -17,11 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.registoev.app.data.EvChargeEntity
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import java.text.SimpleDateFormat
@@ -34,9 +29,9 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
     var showSelectors by remember { mutableStateOf(value = false) }
     
     // Pickers State
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showMonthPicker by remember { mutableStateOf(false) }
-    var showYearPicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(value = false) }
+    var showMonthPicker by remember { mutableStateOf(value = false) }
+    var showYearPicker by remember { mutableStateOf(value = false) }
 
     // --- PICKERS LOGIC ---
     if (showDatePicker) {
@@ -44,9 +39,9 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
         LaunchedEffect(dateRangePickerState.selectedStartDateMillis) {
             dateRangePickerState.selectedStartDateMillis?.let { start ->
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = start }
-                // ISO 8601: Segunda-feira como primeiro dia
+                // Semana começa à Sexta-feira e termina na Quinta-feira seguinte
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -54,12 +49,12 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 
-                val monday = cal.timeInMillis
+                val friday = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val sunday = cal.timeInMillis
+                val thursday = cal.timeInMillis
                 
-                if (dateRangePickerState.selectedStartDateMillis != monday || dateRangePickerState.selectedEndDateMillis != sunday) {
-                    dateRangePickerState.setSelection(monday, sunday)
+                if (dateRangePickerState.selectedStartDateMillis != friday || dateRangePickerState.selectedEndDateMillis != thursday) {
+                    dateRangePickerState.setSelection(friday, thursday)
                 }
             }
         }
@@ -117,9 +112,9 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
         
         when (selectedPeriodType) {
             HistoryPeriod.WEEK -> {
-                // ISO 8601: Segunda-feira como primeiro dia da semana
+                // Semana começa à Sexta-feira
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 startTime = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 7)
@@ -151,7 +146,7 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
         val periodCharges = charges.filter { it.date in startTime until endTime }
 
         // 4. Calcular Consumo Médio
-        val totalKwh = periodCharges.filter { it.chargeType != "Nenhum" }.sumOf { it.kwh }
+        val totalKwh = periodCharges.asSequence().filter { it.chargeType != "Nenhum" }.sumOf { it.kwh }
         val avgConsumption = if (totalKm > 0) (totalKwh * 100.0) / totalKm else 0.0
 
         Triple(totalKm, avgConsumption, periodCharges)
@@ -165,7 +160,7 @@ fun DashboardSection(charges: List<EvChargeEntity>) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")) }
+        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("pt-PT")) }
         val periodDisplay = when(selectedPeriodType) {
             HistoryPeriod.WEEK -> "Semana ${baseCalendar.get(Calendar.WEEK_OF_YEAR)}"
             HistoryPeriod.MONTH -> monthFormat.format(baseCalendar.time)
@@ -255,7 +250,7 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
     var showSelectors by remember { mutableStateOf(value = false) }
     
     // Pickers State
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(value = false) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var showYearPicker by remember { mutableStateOf(false) }
 
@@ -265,9 +260,9 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
         LaunchedEffect(dateRangePickerState.selectedStartDateMillis) {
             dateRangePickerState.selectedStartDateMillis?.let { start ->
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = start }
-                // ISO 8601: Segunda-feira como primeiro dia
+                // Semana começa à Sexta-feira e termina na Quinta-feira seguinte
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -275,12 +270,12 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 
-                val monday = cal.timeInMillis
+                val friday = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val sunday = cal.timeInMillis
+                val thursday = cal.timeInMillis
                 
-                if (dateRangePickerState.selectedStartDateMillis != monday || dateRangePickerState.selectedEndDateMillis != sunday) {
-                    dateRangePickerState.setSelection(monday, sunday)
+                if (dateRangePickerState.selectedStartDateMillis != friday || dateRangePickerState.selectedEndDateMillis != thursday) {
+                    dateRangePickerState.setSelection(friday, thursday)
                 }
             }
         }
@@ -338,9 +333,9 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
 
         when (selectedPeriodType) {
             HistoryPeriod.WEEK -> {
-                // ISO 8601: Segunda-feira como primeiro dia da semana
+                // Semana começa à Sexta-feira
                 val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-                val daysToSubtract = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+                val daysToSubtract = (dayOfWeek - Calendar.FRIDAY + 7) % 7
                 cal.add(Calendar.DAY_OF_YEAR, -daysToSubtract)
                 startTime = cal.timeInMillis
                 cal.add(Calendar.DAY_OF_YEAR, 7)
@@ -371,7 +366,7 @@ fun NetworkEnergySection(charges: List<EvChargeEntity>) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")) }
+        val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("pt-PT")) }
         val periodDisplay = when(selectedPeriodType) {
             HistoryPeriod.WEEK -> "Semana ${baseCalendar.get(Calendar.WEEK_OF_YEAR)}"
             HistoryPeriod.MONTH -> monthFormat.format(baseCalendar.time)

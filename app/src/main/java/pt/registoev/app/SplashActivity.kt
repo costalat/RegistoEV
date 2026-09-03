@@ -16,9 +16,12 @@ class SplashActivity : ComponentActivity() {
         setContentView(R.layout.activity_splash)
         
         // Aguarda 1 segundo para o utilizador ver a imagem e depois segue para a app
-        Handler(Looper.getMainLooper()).postDelayed({
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-        }, 1000)
+        Handler(Looper.getMainLooper()).postDelayed(
+            {
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            },
+            1000L,
+        )
     }
 }

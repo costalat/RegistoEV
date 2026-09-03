@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +39,7 @@ import java.util.*
 fun AddChargeScreen(
     existingCharges: List<EvChargeEntity>,
     editingRecord: EvChargeEntity? = null,
-    onSave: (String, String, Int, String, Double, Long, Long?, String) -> Unit,
+    onSave: (String, String, Int, String, Double, Long, Long?, String, Double?, String?) -> Unit,
     onCancelEdit: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -50,14 +49,14 @@ fun AddChargeScreen(
     var locations by remember { 
         mutableStateOf(
             sharedPrefs.getStringSet("custom_locations", setOf("Entroncamento", "Benavente"))
-                ?.toList()?.sorted() ?: listOf("Benavente", "Entroncamento")
+                ?.asSequence()?.sorted()?.toList() ?: listOf("Benavente", "Entroncamento"),
         )
     }
 
     var stationCodes by remember {
-        mutableStateOf<List<String>>(
+        mutableStateOf(
             sharedPrefs.getStringSet("custom_station_codes", emptySet())
-                ?.toList()?.sorted() ?: emptyList()
+                ?.asSequence()?.sorted()?.toList() ?: emptyList<String>()
         )
     }
 
@@ -69,17 +68,20 @@ fun AddChargeScreen(
     var odometer by remember(editId) { mutableStateOf(editingRecord?.odometer?.toString() ?: "") }
     var chargeType by remember(editId) { mutableStateOf(editingRecord?.chargeType ?: "Nenhum") }
     var kwh by remember(editId) { mutableStateOf(TextFieldValue(editingRecord?.kwh?.toString() ?: "")) }
+    var liters by remember(editId) { mutableStateOf(TextFieldValue(editingRecord?.liters?.toString() ?: "")) }
+    var fuelLocation by remember(editId) { mutableStateOf(editingRecord?.localidade ?: "") }
     var codPosto by remember(editId) { mutableStateOf(editingRecord?.codPosto ?: "") }
     var selectedDate by remember(editId) { mutableLongStateOf(editingRecord?.date ?: System.currentTimeMillis()) }
     
     var showDatePicker by remember { mutableStateOf(value = false) }
-    val dateFormatter = remember { SimpleDateFormat("dd MMMM yyyy", Locale("pt", "PT")) }
+    val dateFormatter = remember { SimpleDateFormat("dd MMMM yyyy", Locale.forLanguageTag("pt-PT")) }
 
     val odometerFocusRequester = remember { FocusRequester() }
     val kwhFocusRequester = remember { FocusRequester() }
+    val fuelLocationFocusRequester = remember { FocusRequester() }
     val codPostoFocusRequester = remember { FocusRequester() }
 
-    val chargeTypes = listOf("Nenhum", "Portátil", "Rede MOBI.E", "Rede Exército")
+    val chargeTypes = listOf("Nenhum", "Portátil", "Rede MOBI.E", "Rede VOLTE.E", "Combustível")
 
     // Diálogos para gerir localizações
     var pendingLocationToAdd by remember { mutableStateOf<String?>(null) }
@@ -123,10 +125,15 @@ fun AddChargeScreen(
             }
             3 -> { // Passo Final: Guardar Efetivamente
                 val odoVal = odometer.toIntOrNull() ?: 0
-                val kwhVal = if (chargeType == "Nenhum") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
-                onSave(origin, destination, odoVal, chargeType, kwhVal, selectedDate, editingRecord?.id, codPosto)
+                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
+                val litersVal = if (chargeType == "Combustível") (liters.text.toDoubleOrNull() ?: 0.0) else null
+                
+                // Se for combustível, passamos o local manual
+                val manualLoc = if (chargeType == "Combustível") fuelLocation else null
+                
+                onSave(origin, destination, odoVal, chargeType, kwhVal, selectedDate, editingRecord?.id, codPosto, litersVal, manualLoc)
                 if (editingRecord == null) {
-                    origin = ""; destination = ""; odometer = ""; kwh = TextFieldValue(""); chargeType = "Nenhum"; codPosto = ""
+                    origin = ""; destination = ""; odometer = ""; kwh = TextFieldValue(""); liters = TextFieldValue(""); fuelLocation = ""; chargeType = "Nenhum"; codPosto = ""
                 }
             }
         }
@@ -138,8 +145,13 @@ fun AddChargeScreen(
     val odoError = remember(odometerValue, selectedDate, otherCharges, editingRecord) {
         if (odometerValue <= 0) return@remember null
         
-        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
-        calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = selectedDate
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
         val startOfCurrentDay = calendar.timeInMillis
         calendar.add(Calendar.DAY_OF_YEAR, 1)
         val startOfNextDay = calendar.timeInMillis
@@ -148,34 +160,24 @@ fun AddChargeScreen(
             // REGRA PARA NOVO REGISTO: Validar contra histórico existente na mesma data ou datas adjacentes
             
             // 1. Limites entre dias diferentes
-            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            val maxPrevDays = otherCharges.asSequence().filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
             if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Deve ser superior aos dias anteriores ($maxPrevDays km)"
             
-            val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
+            val minNextDays = otherCharges.asSequence().filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
             if (minNextDays != null && odometerValue > minNextDays) return@remember "Deve ser inferior aos dias seguintes ($minNextDays km)"
 
             // 2. Limites no próprio dia (caso esteja a inserir um registo com data retroativa para hoje)
-            val sameDayCharges = otherCharges.filter { it.date in startOfCurrentDay until startOfNextDay }
+            val sameDayCharges = otherCharges.asSequence().filter { (it.date in startOfCurrentDay until startOfNextDay) }.toList()
             if (sameDayCharges.isNotEmpty()) {
-                // Como é novo, assumimos que se insere no fim da lista do dia (ou no meio se houver km maiores)
-                val maxSameDayBelow = sameDayCharges.filter { it.odometer < odometerValue }.maxOfOrNull { it.odometer }
-                val minSameDayAbove = sameDayCharges.filter { it.odometer > odometerValue }.minOfOrNull { it.odometer }
-                
-                // Validação lógica: se estamos a tentar inserir um valor que "atropela" a ordem crescente
-                val hasHigherKmToday = sameDayCharges.any { it.odometer >= odometerValue && it.date <= selectedDate }
-                val hasLowerKmToday = sameDayCharges.any { it.odometer <= odometerValue && it.date >= selectedDate }
-                
                 // Simplificação: o valor deve apenas encaixar na sequência crescente global
                 val absoluteMax = otherCharges.maxOfOrNull { it.odometer } ?: 0
                 if (selectedDate >= System.currentTimeMillis() - 60000 && odometerValue <= absoluteMax) {
                     return@remember "Deve ser superior ao último registo: $absoluteMax km"
                 }
-            } else {
-                // Sem registos no dia, basta ser maior que o passado e menor que o futuro
             }
         } else {
             // REGRA PARA EDIÇÃO: Validação cronológica detalhada (já implementada)
-            val maxPrevDays = otherCharges.filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
+            val maxPrevDays = otherCharges.asSequence().filter { it.date < startOfCurrentDay }.maxOfOrNull { it.odometer }
             if (maxPrevDays != null && odometerValue < maxPrevDays) return@remember "Mínimo permitido (dias anteriores): $maxPrevDays km"
             
             val minNextDays = otherCharges.filter { it.date >= startOfNextDay }.minOfOrNull { it.odometer }
@@ -323,9 +325,19 @@ fun AddChargeScreen(
             Text("TRAJETO", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
             IOSRowCard {
                 Column {
-                    CompactInputField(label = "Origem", value = origin, onValueChange = { origin = it }, suggestions = locations, onLongPress = { pendingLocationToDelete = it })
+                    CompactInputField(
+                        label = "Origem",
+                        value = origin,
+                        onValueChange = { origin = it },
+                        suggestions = locations
+                    ) { pendingLocationToDelete = it }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.05f))
-                    CompactInputField(label = "Destino", value = destination, onValueChange = { destination = it }, suggestions = locations, onLongPress = { pendingLocationToDelete = it })
+                    CompactInputField(
+                        label = "Destino",
+                        value = destination,
+                        onValueChange = { destination = it },
+                        suggestions = locations
+                    ) { pendingLocationToDelete = it }
                 }
             }
         }
@@ -352,12 +364,14 @@ fun AddChargeScreen(
                     Text("km", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
                 }
             }
-            if (odoError != null) Text(text = odoError, color = Color(0xFFE53935), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            odoError?.let {
+                Text(text = it, color = Color(0xFFE53935), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            }
         }
 
         // --- CARREGAMENTO ---
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("TIPO DE CARGA", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
+            Text("TIPO DE ABASTECIMENTO", style = MaterialTheme.typography.labelMedium, color = Color.DarkGray, modifier = Modifier.padding(start = 12.dp))
             IOSRowCard {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -367,7 +381,7 @@ fun AddChargeScreen(
                             val activeColor = when (type) {
                                 "Portátil" -> Color(0xFFFFB300)
                                 "Rede MOBI.E" -> Color(0xFF26C6DA)
-                                "Rede Exército" -> Color(0xFF046A38)
+                                "Rede VOLTE.E" -> Color(0xFF046A38)
                                 else -> Color.White.copy(alpha = 0.15f)
                             }
                             Box(
@@ -384,28 +398,75 @@ fun AddChargeScreen(
 
                     AnimatedVisibility(visible = chargeType != "Nenhum", enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable { 
-                                    kwhFocusRequester.requestFocus()
-                                    kwh = kwh.copy(selection = TextRange(0, kwh.text.length))
-                                }, 
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Energia", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
-                                Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
-                                    BasicTextField(
-                                        value = kwh, onValueChange = { kwh = it }, 
-                                        modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) kwh = kwh.copy(selection = TextRange(0, kwh.text.length)) },
-                                        textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50)),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFF4CAF50)), singleLine = true,
-                                        decorationBox = { innerTextField ->
-                                            if (kwh.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
-                                            innerTextField()
-                                        }
-                                    )
+                            if (chargeType != "Combustível") {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { 
+                                        kwhFocusRequester.requestFocus()
+                                        kwh = kwh.copy(selection = TextRange(0, kwh.text.length))
+                                    }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Energia", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = kwh, onValueChange = { kwh = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) kwh = kwh.copy(selection = TextRange(0, kwh.text.length)) },
+                                            textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50)),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFF4CAF50)), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (kwh.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                    Text("kWh", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
                                 }
-                                Text("kWh", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
+                            } else {
+                                // Campo de Litros para Combustível
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { 
+                                        kwhFocusRequester.requestFocus()
+                                        liters = liters.copy(selection = TextRange(0, liters.text.length))
+                                    }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Quantidade", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = liters, onValueChange = { liters = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) liters = liters.copy(selection = TextRange(0, liters.text.length)) },
+                                            textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300)),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFFFFB300)), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (liters.text.isEmpty()) Text("0.0", color = Color.DarkGray, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                    Text("l", color = Color.DarkGray, modifier = Modifier.padding(start = 4.dp))
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { fuelLocationFocusRequester.requestFocus() }, 
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Local de abastecimento", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                                    Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.CenterEnd) {
+                                        BasicTextField(
+                                            value = fuelLocation, onValueChange = { fuelLocation = it }, 
+                                            modifier = Modifier.fillMaxWidth().focusRequester(fuelLocationFocusRequester),
+                                            textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color.White),
+                                            cursorBrush = SolidColor(Color.White), singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (fuelLocation.isEmpty()) Text("Posto / Localidade", color = Color.DarkGray, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
+                                }
                             }
                             
                             if (chargeType == "Rede MOBI.E") {
@@ -447,9 +508,14 @@ fun AddChargeScreen(
 
         // --- BOTÃO GUARDAR ---
         Spacer(modifier = Modifier.height(8.dp))
-        val isFormValid = origin.isNotBlank() && destination.isNotBlank() && odometer.isNotBlank() && odoError == null && (chargeType == "Nenhum" || kwh.text.isNotBlank())
+        val isFormValid = origin.isNotBlank() && destination.isNotBlank() && odometer.isNotBlank() && odoError == null && 
+                (chargeType == "Nenhum" || 
+                 (chargeType == "Combustível" && liters.text.isNotBlank() && fuelLocation.isNotBlank()) || 
+                 (chargeType != "Combustível" && kwh.text.isNotBlank()))
         Button(
-            onClick = { checkAndSave(0) },
+            onClick = {
+                checkAndSave(0)
+            },
             modifier = Modifier.fillMaxWidth().height(52.dp), enabled = isFormValid,
             colors = ButtonDefaults.buttonColors(containerColor = if (isFormValid) Color(0xFF4CAF50) else Color.White, contentColor = if (isFormValid) Color.White else Color.Black, disabledContainerColor = Color.White.copy(alpha = 0.1f), disabledContentColor = Color.DarkGray),
             shape = RoundedCornerShape(12.dp)
@@ -476,10 +542,13 @@ fun CompactInputField(label: String, value: String, onValueChange: (String) -> U
         Row(modifier = Modifier.padding(top = 2.dp, start = 70.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             suggestions.forEach { loc ->
                 val isSelected = value == loc
-                Text(text = loc, color = if (isSelected) Color.Black else Color.LightGray, fontSize = 12.sp,
+                Text(
+                    text = loc,
+                    color = if (isSelected) Color.Black else Color.LightGray,
+                    fontSize = 12.sp,
                     modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(if (isSelected) Color.White else Color.White.copy(alpha = 0.08f))
                         .combinedClickable(onClick = { onValueChange(loc) }, onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongPress(loc) })
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
         }

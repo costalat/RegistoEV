@@ -5,7 +5,7 @@ import android.content.Context
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities=[EvChargeEntity::class], version=4)
+@Database(entities=[EvChargeEntity::class], version=6)
 abstract class AppDatabase: RoomDatabase() {
  abstract fun dao(): EvDao
  companion object {
@@ -15,9 +15,21 @@ abstract class AppDatabase: RoomDatabase() {
       }
   }
 
+  private val MIGRATION_4_5 = object : Migration(4, 5) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+          db.execSQL("ALTER TABLE ev_charges ADD COLUMN localidade TEXT NOT NULL DEFAULT ''")
+      }
+  }
+
+  private val MIGRATION_5_6 = object : Migration(5, 6) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+          db.execSQL("ALTER TABLE ev_charges ADD COLUMN liters REAL")
+      }
+  }
+
   fun get(ctx: Context) = Room.databaseBuilder(ctx, AppDatabase::class.java, "ev.db")
-      .addMigrations(MIGRATION_3_4)
-      .fallbackToDestructiveMigrationOnDowngrade(true) // Versão não obsoleta
+      .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+      .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
       .build()
  }
 }

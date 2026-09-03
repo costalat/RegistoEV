@@ -1,10 +1,10 @@
 package pt.registoev.app.ui
 
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -29,29 +29,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import pt.registoev.app.data.EvChargeEntity
+import pt.registoev.app.sync.CloudSyncManager
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BackupScreen(
-    onImport: (List<EvChargeEntity>) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onImport: (List<EvChargeEntity>) -> Unit,
     onExportToFile: (Uri) -> Unit,
     onImportFromFile: (Uri) -> Unit,
     charges: List<EvChargeEntity>,
-    onExportCsv: (Uri, String) -> Unit
+    onExportCsv: (Uri, String) -> Unit,
 ) {
     val ctx = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
-    var isError by remember { mutableStateOf(false) }
+    var isError by remember { mutableStateOf(value = false) }
 
     // State for CSV Export Workflow
-    var showExportOptions by remember { mutableStateOf(false) }
+    var showExportOptions by remember { mutableStateOf(value = false) }
     var selectedExportType by remember { mutableStateOf<String?>(null) } // "Movimentos" or "Carregamentos"
     var selectedExportPeriodType by remember { mutableStateOf<String?>(null) } // "Semana", "Mês", "Ano"
     
@@ -68,7 +70,7 @@ fun BackupScreen(
     var pdfChargesToExport by remember { mutableStateOf<List<EvChargeEntity>>(emptyList()) }
 
     val csvLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
+        contract = ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri ->
         if (uri != null) {
             onExportCsv(uri, csvContentToExport)
@@ -171,7 +173,7 @@ fun BackupScreen(
                         val year = cal.get(Calendar.YEAR)
                         
                         csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Semana", cal)
-                        pendingFileName = "export_${selectedExportType!!.lowercase()}_semana_${weekNum}_${year}.csv"
+                        pendingFileName = "export_${selectedExportType!!.lowercase()}_semana_${weekNum}_$year.csv"
                         csvLauncher.launch(pendingFileName)
                     }
                     showDatePicker = false
@@ -218,7 +220,6 @@ fun BackupScreen(
                 if (selectedExportType == "Carregamentos") {
                     pdfBaseCalendar = cal
                     pdfChargesToExport = filterChargesForPeriod(charges, "Mês", cal)
-                    // Não lançamos logo o launcher, deixamos o utilizador escolher CSV ou PDF Oficial no Step 3
                 } else {
                     csvContentToExport = generateCsvForPeriod(charges, selectedExportType!!, "Mês", cal)
                     pendingFileName = "export_${selectedExportType!!.lowercase()}_mes_${year}_${month + 1}.csv"
@@ -292,7 +293,7 @@ fun BackupScreen(
                         listOf("Movimentos", "Carregamentos").forEach { type ->
                             FilterChip(
                                 selected = selectedExportType == type,
-                                onClick = { selectedExportType = type; selectedExportPeriodType = null },
+                                onClick = { selectedExportType = type; selectedExportPeriodType = null; pdfBaseCalendar = null },
                                 label = { Text(type) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color.White,
@@ -335,7 +336,7 @@ fun BackupScreen(
                                     Button(
                                         onClick = { 
                                             val monthYear = SimpleDateFormat("MM_yyyy", Locale.getDefault()).format(pdfBaseCalendar!!.time)
-                                            pdfLauncher.launch("reporte_mensal_${monthYear}.pdf") 
+                                            pdfLauncher.launch("reporte_mensal_$monthYear.pdf") 
                                         },
                                         modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
@@ -358,6 +359,65 @@ fun BackupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Cancelar", color = Color.DarkGray)
+                    }
+                }
+            }
+        }
+
+        // --- SECÇÃO NUVEM (GOOGLE SHEETS) ---
+        var isSyncing by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+            shape = RoundedCornerShape(24.dp),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF4CAF50).copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.CloudSync, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Sincronização Cloud", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Sincronize todo o seu histórico local com o Google Sheets.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = {
+                        val prefs = ctx.getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE)
+                        val vehiclePlate = prefs.getString("vehicle_plate", "") ?: ""
+                        val driverName = prefs.getString("driver_name", "") ?: ""
+                        
+                        scope.launch {
+                            isSyncing = true
+                            charges.forEach { charge ->
+                                CloudSyncManager.syncRecord(charge, vehiclePlate, driverName)
+                                delay(200L) // Evitar rate limiting do script do Google
+                            }
+                            isSyncing = false
+                            Toast.makeText(ctx, "Sincronização concluída!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSyncing,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2196F3),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Sincronizar Histórico Agora", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -581,7 +641,7 @@ fun filterChargesForPeriod(charges: List<EvChargeEntity>, periodType: String, ca
         }
         else -> { startTime = 0; endTime = Long.MAX_VALUE }
     }
-    return charges.filter { it.date in startTime until endTime }.sortedBy { it.date }
+    return charges.asSequence().filter { it.date in startTime until endTime }.sortedBy { it.date }.toList()
 }
 
 fun exportMonthlyReportToPdf(
@@ -597,7 +657,7 @@ fun exportMonthlyReportToPdf(
     val modelo = prefs.getString("vehicle_model", "") ?: ""
     val matricula = prefs.getString("vehicle_plate", "") ?: ""
 
-    val reportMonth = SimpleDateFormat("MMMM yyyy", Locale("pt", "PT")).format(calendar.time).uppercase()
+    val reportMonth = SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("pt-PT")).format(calendar.time).uppercase()
     val pdfDocument = PdfDocument()
     val textPaint = Paint().apply { textSize = 10f; isAntiAlias = true }
     val titlePaint = Paint().apply { 
@@ -655,9 +715,9 @@ fun exportMonthlyReportToPdf(
 
         // --- 4. TABELA ---
         val tableTop = currentY
-        val colWidths = floatArrayOf(75f, 80f, 45f, 60f, 90f, 75f, 90f)
-        val headers = arrayOf("Data de", "Tipologia de", "KW", "Km da", "Nome/Código", "Localidade", "Condutor")
-        val headers2 = arrayOf("carregamento", "Carregamento", "abastecidos", "viatura", "Posto", "", "")
+        val colWidths = floatArrayOf(75f, 60f, 45f, 55f, 80f, 85f, 90f)
+        val headers = arrayOf("Data", "Tipo carreg", "KW", "Km", "Código posto", "Localidade", "Condutor")
+        val headers2 = arrayOf("", "", "abast", "", "", "", "")
         
         var currentX = margin
         val rowHeight = 25f
@@ -692,12 +752,14 @@ fun exportMonthlyReportToPdf(
                 String.format(Locale.US, "%.1f", charge.kwh),
                 charge.odometer.toString(),
                 charge.codPosto,
-                "", 
+                charge.localidade, 
                 condutor
             )
 
             for (j in rowData.indices) {
-                canvas.drawText(rowData[j], currentX + 5f, y + 18f, textPaint)
+                val maxWidth = colWidths[j] - 8f
+                val displayText = truncateText(rowData[j], textPaint, maxWidth)
+                canvas.drawText(displayText, currentX + 5f, y + 18f, textPaint)
                 canvas.drawLine(currentX, y, currentX, y + rowHeight, textPaint)
                 currentX += colWidths[j]
             }
@@ -743,6 +805,21 @@ fun exportMonthlyReportToPdf(
     }
 }
 
+private fun truncateText(text: String, paint: Paint, maxWidth: Float): String {
+    if (paint.measureText(text) <= maxWidth) return text
+    
+    val ellipsis = "..."
+    val ellipsisWidth = paint.measureText(ellipsis)
+    
+    if (ellipsisWidth > maxWidth) return ""
+    
+    var truncated = text
+    while (truncated.isNotEmpty() && paint.measureText(truncated + ellipsis) > maxWidth) {
+        truncated = truncated.substring(0, truncated.length - 1)
+    }
+    return truncated + ellipsis
+}
+
 fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType: String, calendar: Calendar): String {
     val startTime: Long
     val endTime: Long
@@ -750,15 +827,9 @@ fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType
     val baseCal = calendar.clone() as Calendar
     when (periodType) {
         "Semana" -> {
-            // Ajustar explicitamente para o Domingo anterior (00:00:00)
             baseCal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
-            baseCal.set(Calendar.HOUR_OF_DAY, 0)
-            baseCal.set(Calendar.MINUTE, 0)
-            baseCal.set(Calendar.SECOND, 0)
-            baseCal.set(Calendar.MILLISECOND, 0)
+            baseCal.set(Calendar.HOUR_OF_DAY, 0); baseCal.set(Calendar.MINUTE, 0); baseCal.set(Calendar.SECOND, 0); baseCal.set(Calendar.MILLISECOND, 0)
             startTime = baseCal.timeInMillis
-            
-            // Adicionar 7 dias para chegar ao próximo Domingo (exclui o início do próximo Domingo)
             baseCal.add(Calendar.DAY_OF_YEAR, 7)
             endTime = baseCal.timeInMillis
         }
@@ -784,14 +855,14 @@ fun generateCsvForPeriod(charges: List<EvChargeEntity>, type: String, periodType
     val df = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     if (type == "Movimentos") {
-        sb.append("Data;Origem;Destino;Odometer\n")
+        sb.append("Data;Origem;Destino;Localidade;Odometer\n")
         filtered.sortedBy { it.date }.forEach {
-            sb.append("${df.format(Date(it.date))};${it.origin};${it.destination};${it.odometer}\n")
+            sb.append("${df.format(Date(it.date))};${it.origin};${it.destination};${it.localidade};${it.odometer}\n")
         }
     } else {
-        sb.append("Data;Local;Tipo Carga;Cod. Posto;kWh\n")
+        sb.append("Data;Localidade;Tipo Carga;Cod. Posto;kWh\n")
         filtered.filter { it.chargeType != "Nenhum" }.sortedBy { it.date }.forEach {
-            sb.append("${df.format(Date(it.date))};${it.destination};${it.chargeType};${it.codPosto};${it.kwh}\n")
+            sb.append("${df.format(Date(it.date))};${it.localidade};${it.chargeType};${it.codPosto};${it.kwh}\n")
         }
     }
     return sb.toString()
@@ -818,7 +889,8 @@ fun parseJsonBackup(json: String): List<EvChargeEntity> {
             chargeType = if (obj.has("tipoCarga")) obj.getString("tipoCarga") else obj.optString("chargeType", "Nenhum"),
             kwh = if (obj.has("kw")) obj.getDouble("kw") else obj.optDouble("kwh", 0.0),
             date = dateValue,
-            codPosto = if (obj.has("codPosto")) obj.getString("codPosto") else obj.optString("stationCode", "")
+            codPosto = if (obj.has("codPosto")) obj.getString("codPosto") else obj.optString("stationCode", ""),
+            localidade = if (obj.has("localidade")) obj.getString("localidade") else obj.optString("location", "")
         ))
     }
     return result
@@ -837,6 +909,7 @@ fun exportRecordsToJson(charges: List<EvChargeEntity>): String {
         obj.put("kw", charge.kwh)
         obj.put("tipoCarga", charge.chargeType)
         obj.put("codPosto", charge.codPosto)
+        obj.put("localidade", charge.localidade)
         array.put(obj)
     }
     return array.toString(2)

@@ -47,6 +47,7 @@
   .kpis{grid-template-columns:repeat(6,1fr)}
   .row3{grid-template-columns:repeat(3,1fr)}
   .row-hb{grid-template-columns:1.5fr 1fr}
+  .row-tables{grid-template-columns:1fr 1fr 1.3fr}
 
   .card{
     background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
@@ -70,6 +71,34 @@
 
   .chart{width:100%;height:330px}
   .chart.tall{height:360px}
+
+  /* ---------- gauge rows (phone) ---------- */
+  .gauge-row{display:flex;align-items:center;gap:14px;padding:6px 0;border-bottom:1px solid var(--border)}
+  .gauge-row:last-child{border-bottom:none}
+  .gauge-row .gwrap{width:118px;height:72px;flex:none}
+  .gauge-row .gmeta{flex:1;min-width:0}
+  .gauge-row .gname{font-size:13px;font-weight:700;color:var(--text)}
+  .gauge-row .gsub{font-size:11px;color:var(--faint);margin-top:2px}
+  .gauge-row .gval{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+  .gtrack{height:6px;border-radius:4px;background:var(--track);margin-top:7px;overflow:hidden}
+  .gtrack i{display:block;height:100%;border-radius:4px}
+
+  /* ---------- vehicle cards (phone) ---------- */
+  .vcard{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--alt)}
+  .vcard:last-child{margin-bottom:0}
+  .vhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .vhead b{font-size:14px}
+  .vhead .vdrv{font-size:11px;color:var(--faint);text-align:right}
+  .vstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .vstats div{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 8px;text-align:center}
+  .vstats span{display:block;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .vstats b{font-size:14px;font-variant-numeric:tabular-nums}
+
+  /* ---------- back to top ---------- */
+  #totop{position:fixed;right:16px;bottom:16px;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:18px;
+    box-shadow:var(--shadow);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:60}
+  #totop.on{display:flex}
 
   /* ---------- tables ---------- */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -103,6 +132,7 @@
   @media(max-width:1240px){
     .kpis{grid-template-columns:repeat(3,1fr)}
     .row3{grid-template-columns:1fr 1fr}
+    .row-tables{grid-template-columns:1fr 1fr}
     .row-hb{grid-template-columns:1fr}
   }
   @media(max-width:820px){
@@ -110,7 +140,55 @@
     .hrow{padding:14px}
     .kpis{grid-template-columns:repeat(2,1fr)}
     .row3{grid-template-columns:1fr}
+    .row-tables{grid-template-columns:1fr}
     .htitle{font-size:20px}
+  }
+
+  /* ============ PHONE (<640px) ============ */
+  @media(max-width:640px){
+    body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+    .wrap{padding:0 12px;padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
+    .hrow{padding:12px 14px;gap:10px;flex-wrap:wrap}
+    .htitle{font-size:18px}
+    .hsub{display:none}
+    .hright{width:100%;gap:8px}
+    .chip{height:30px;padding:0 11px;font-size:11.5px;flex:1;justify-content:center}
+
+    .grid{gap:12px;margin-top:14px}
+    .kpis{grid-template-columns:repeat(2,1fr);gap:10px}
+    .card{padding:14px;border-radius:14px}
+
+    /* taller, readable KPI cards */
+    .kpi{padding:13px 14px}
+    .kpi .lab{font-size:9.5px;letter-spacing:.06em}
+    .kpi .val{font-size:24px;margin:8px 0 2px}
+    .kpi .unit{font-size:10.5px}
+    .kpi .bar{margin-top:11px}
+
+    /* charts: shorter so the page isn't absurdly long */
+    .chart{height:250px}
+    .chart.tall{height:270px}
+
+    /* tables: tighter, hide low-priority columns */
+    table{font-size:12px}
+    thead th{padding:8px 8px;font-size:9.5px}
+    tbody td{padding:8px 8px}
+    .hide-sm{display:none}
+
+    /* heatmap: transpose -> months as rows, fewer columns */
+    .hm{font-size:10px;border-spacing:2px}
+    .hm th{font-size:9px;padding:2px 3px}
+    .hm td{padding:6px 3px}
+
+    footer{margin-top:18px;flex-direction:column;gap:6px;font-size:11px}
+    .err-banner{font-size:12px;padding:10px 12px}
+  }
+  @media(max-width:380px){
+    .kpi .val{font-size:21px}
+    .card{padding:12px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
   }
 </style>
 </head>
@@ -167,7 +245,7 @@
     </div>
   </div>
 
-  <div class="grid row3" style="grid-template-columns:1fr 1fr 1.3fr">
+  <div class="grid row3 row-tables">
     <div class="card">
       <div class="ctitle"><div><h3>Por viatura</h3><div class="sub">Detalhe por matrícula</div></div></div>
       <div id="veh"></div>
@@ -362,6 +440,12 @@ function compute(rec){
 }
 
 /* =========================================================================
+   Responsive helpers
+   ========================================================================= */
+const MQ_PHONE = window.matchMedia('(max-width: 640px)');
+const isPhone = () => MQ_PHONE.matches;
+
+/* =========================================================================
    Gauges (ECharts)
    ========================================================================= */
 function gaugeChart(el, items){
@@ -369,6 +453,45 @@ function gaugeChart(el, items){
   const charts=[];
   const host = document.getElementById(el);
   host.innerHTML='';
+  host.__charts = charts;
+
+  if(isPhone()){
+    // one row per indicator: small dial + name + value + bar
+    host.style.display='block';
+    host.style.height='auto';
+    items.forEach((it)=>{
+      const col = it.color || color(it.value);
+      const row = document.createElement('div');
+      row.className='gauge-row';
+      row.innerHTML = `
+        <div class="gwrap"></div>
+        <div class="gmeta">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+            <span class="gname">${it.title}</span>
+            <span class="gval" style="color:${col}">${Math.round(it.value)}%</span>
+          </div>
+          <div class="gsub">${it.sub||''}</div>
+          <div class="gtrack"><i style="width:${Math.max(2,it.value).toFixed(1)}%;background:${col}"></i></div>
+        </div>`;
+      host.appendChild(row);
+      const ch = echarts.init(row.querySelector('.gwrap'));
+      ch.setOption({
+        series:[{
+          type:'gauge', startAngle:180, endAngle:0, min:0, max:100,
+          radius:'100%', center:['50%','88%'],
+          progress:{show:true,width:9,roundCap:true,itemStyle:{color:col}},
+          axisLine:{lineStyle:{width:9,color:[[1,C.track]]}},
+          pointer:{show:false},axisTick:{show:false},splitLine:{show:false},axisLabel:{show:false},anchor:{show:false},
+          detail:{show:false}, title:{show:false},
+          data:[{value:it.value}]
+        }]
+      });
+      charts.push(ch);
+    });
+    return charts;
+  }
+
+  // desktop / tablet: dials side by side
   host.style.display='grid';
   host.style.gridTemplateColumns='repeat('+items.length+',1fr)';
   host.style.gap='4px';
@@ -391,7 +514,6 @@ function gaugeChart(el, items){
       }]
     });
     charts.push(ch);
-    if(i===0) host.__charts=charts;
   });
   return charts;
 }
@@ -466,9 +588,9 @@ function renderGauges(M){
   const util = Math.min(100, M.activeDays/Math.max(1,M.spanDays)*100);
   const intens = M.dist ? Math.min(100, M.cons/25*100) : 0;
   gaugeChart('gauges', [
-    {title:'Eletrificação', value:elet, color:C.green},
-    {title:'Utilização',    value:util, color:C.blue},
-    {title:'Intensidade',   value:intens, color:C.amber},
+    {title:'Eletrificação', value:elet, color:C.green, sub:'Energia elétrica vs combustível'},
+    {title:'Utilização',    value:util, color:C.blue, sub:`${M.activeDays} de ${M.spanDays} dias com registo`},
+    {title:'Intensidade',   value:intens, color:C.amber, sub:`${fmt(M.cons,1)} kWh/100 km (escala 0–25)`},
   ]);
 }
 
@@ -578,6 +700,16 @@ function renderBubble(M){
 function renderStations(M){
   const top = M.stations.slice(0,10);
   const mx = top[0]?.kwh||1;
+  if(isPhone()){
+    // Posto + energia on one line, sessões as a small meta line (2 visual columns)
+    $('#stations').innerHTML = `<table>
+      <thead><tr><th>Posto</th><th class="num">Energia</th></tr></thead>
+      <tbody>${top.map(s=>`
+        <tr><td>${s.posto}<div style="font-weight:400;color:var(--faint);font-size:10.5px">${s.sess} sessões</div></td>
+        <td class="num dbar"><i style="width:${(s.kwh/mx*88).toFixed(0)}%;background:${C.amber}"></i><span>${fmt(s.kwh,1)}</span></td></tr>`).join('')}</tbody>
+    </table>`;
+    return;
+  }
   $('#stations').innerHTML = `<table>
     <thead><tr><th>Posto</th><th class="num">Energia</th><th class="num">Sessões</th></tr></thead>
     <tbody>${top.map(s=>`
@@ -589,6 +721,20 @@ function renderStations(M){
 
 function renderVehicles(M){
   const names = Object.keys(M.veh).sort();
+  if(isPhone()){
+    // one card per vehicle (5 columns don't fit a phone)
+    $('#veh').innerHTML = `<div>${names.map(n=>{
+      const v=M.veh[n]; const ef=v.kwh? v.dist/v.kwh*100:0;
+      return `<div class="vcard">
+        <div class="vhead"><b>${n}</b><span class="vdrv">${v.cond||'—'}</span></div>
+        <div class="vstats">
+          <div><span>Dist.</span><b>${fmt(v.dist)}</b></div>
+          <div><span>Energia</span><b>${fmt(v.kwh,1)}</b></div>
+          <div><span>km/100kWh</span><b>${fmt(ef,0)}</b></div>
+        </div>
+      </div>`;}).join('')}</div>`;
+    return;
+  }
   $('#veh').innerHTML = `<table>
     <thead><tr><th>Matrícula</th><th class="num">Dist.</th><th class="num">Energia</th><th class="num">Sessões</th><th class="num">km/100kWh</th></tr></thead>
     <tbody>${names.map(n=>{const v=M.veh[n]; const ef=v.kwh? v.dist/v.kwh*100:0; return `
@@ -611,23 +757,33 @@ function renderMonths(M){
 }
 
 function renderHeat(M){
-  const rows = M.stations.slice(0,10);
+  const phone = isPhone();
+  // Phone: transpose -> months as rows, only the top stations as columns
+  const rows = phone ? M.stations.slice(0,5) : M.stations.slice(0,10);
   const cols = M.months;
   const vals = rows.flatMap(s=>cols.map(k=>(M.heat[s.posto]||{})[k]||0)).filter(v=>v>0).sort((a,b)=>a-b);
   // percentile-based scale (p10..p95) so mid values differentiate well
   const q=(p)=>{ if(!vals.length) return 1; const i=Math.min(vals.length-1, Math.max(0, Math.round((vals.length-1)*p))); return vals[i]; };
   const lo=q(0.10)||1, hi=q(0.95)||1;
   const scale=(v)=>{ const t=Math.min(1, Math.max(0, (Math.log(1+v)-Math.log(1+lo))/(Math.log(1+hi)-Math.log(1+lo)||1))); return t; };
-  const max=Math.max(...vals,1);
-  const head = `<tr><th class="rowh"></th>${cols.map(k=>`<th>${monthLabel(k)}</th>`).join('')}</tr>`;
-  const body = rows.map(s=>{
-    const cells = cols.map(k=>{
-      const v=(M.heat[s.posto]||{})[k]||0;
-      if(v<=0) return `<td class="empty">·</td>`;
+  const cell=(v)=>{ if(v<=0) return `<td class="empty">·</td>`;
       const t=scale(v); const op=(0.10+t*0.90).toFixed(2);
       const txt = (v>=1) ? fmt(v,0) : '';
-      return `<td style="background:rgba(13,148,136,${op});color:${t>0.55?'#fff':'#0f766e'}" title="${fmt(v,1)} kWh">${txt}</td>`;
+      return `<td style="background:rgba(13,148,136,${op});color:${t>0.55?'#fff':'#0f766e'}" title="${fmt(v,1)} kWh">${txt}</td>`; };
+
+  if(phone){
+    // months down the side, top-5 stations across
+    const head = `<tr><th class="rowh"></th>${rows.map(s=>`<th>${s.posto.replace('-','‑')}</th>`).join('')}</tr>`;
+    const body = cols.map(k=>{
+      const cells = rows.map(s=>cell((M.heat[s.posto]||{})[k]||0)).join('');
+      return `<tr><th class="rowh">${monthLabel(k)}</th>${cells}</tr>`;
     }).join('');
+    $('#heat').innerHTML = `<table class="hm">${head}${body}</table>`;
+    return;
+  }
+  const head = `<tr><th class="rowh"></th>${cols.map(k=>`<th>${monthLabel(k)}</th>`).join('')}</tr>`;
+  const body = rows.map(s=>{
+    const cells = cols.map(k=>cell((M.heat[s.posto]||{})[k]||0)).join('');
     return `<tr><th class="rowh">${s.posto}</th>${cells}</tr>`;
   }).join('');
   $('#heat').innerHTML = `<table class="hm">${head}${body}</table>`;
@@ -645,6 +801,7 @@ function showError(msg){
     A mostrar a última cópia local (<code>query-fallback.csv</code>).`;
 }
 function renderAll(M){
+  window.__M = M;
   renderKpis(M); renderGauges(M);
   renderCombo(M); renderRadar(M); renderNetwork(M); renderBubble(M);
   renderStations(M); renderVehicles(M); renderMonths(M); renderHeat(M);
@@ -653,7 +810,41 @@ function renderAll(M){
     $('#period').textContent = f(M.dmin)+'  →  '+f(M.dmax);
   }
   $('#stamp').textContent = 'Atualizado: '+new Date().toLocaleString('pt-PT');
-  window.addEventListener('resize', ()=>{ echarts.getInstanceByDom && document.querySelectorAll('.chart,#gauges,#gauges > div').forEach(el=>{const i=echarts.getInstanceByDom(el); if(i) i.resize();}); });
+  window.addEventListener('resize', resizeCharts);
+}
+
+/* resize every ECharts instance (debounced) */
+let __rz;
+function resizeCharts(){
+  clearTimeout(__rz);
+  __rz = setTimeout(()=>{
+    document.querySelectorAll('#combo,#radar,#network,#bubble,#gauges,#gauges > div,#gauges .gwrap').forEach(el=>{
+      const i = echarts.getInstanceByDom(el); if(i) i.resize();
+    });
+  }, 120);
+}
+
+/* re-render when crossing the phone breakpoint (e.g. rotate) */
+function onBreakpoint(){
+  if(!window.__M) return;
+  renderGauges(window.__M);
+  renderStations(window.__M);
+  renderVehicles(window.__M);
+  renderHeat(window.__M);
+  resizeCharts();
+  const t=$('#totop'); if(t) t.classList.toggle('on', window.scrollY > 600);
+}
+if(MQ_PHONE.addEventListener) MQ_PHONE.addEventListener('change', onBreakpoint);
+else if(MQ_PHONE.addListener) MQ_PHONE.addListener(onBreakpoint);
+
+/* back-to-top button (phone) */
+function initToTop(){
+  const b=document.createElement('button');
+  b.id='totop'; b.title='Voltar ao topo'; b.setAttribute('aria-label','Voltar ao topo');
+  b.innerHTML='\u2191';
+  b.addEventListener('click', ()=>window.scrollTo({top:0,behavior:'smooth'}));
+  document.body.appendChild(b);
+  window.addEventListener('scroll', ()=>{ b.classList.toggle('on', window.scrollY > 600); }, {passive:true});
 }
 
 (async function boot(){
@@ -670,6 +861,7 @@ function renderAll(M){
   }
   const M = compute(toRecords(rows));
   renderAll(M);
+  initToTop();
   setStatus(live?'':'busy', live? 'em direto · '+M.trips+' registos · '+M.nCharges+' carregamentos' : 'cópia local · '+M.trips+' registos');
 })();
 </script>

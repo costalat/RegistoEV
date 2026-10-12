@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Frota · AOV</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --alt:#f8fafc; --border:#e2e8f0; --track:#eef2f6;
+    --text:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --blue:#2563eb; --blue-h:#3b82f6; --blue-xl:#eff6ff; --blue-l:#dbeafe;
+    --amber:#f59e0b; --teal:#0d9488; --green:#16a34a; --purple:#7c3aed; --red:#dc2626;
+    --radius:16px; --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:0 0 40px;
+  }
+  .wrap{max-width:1560px;margin:0 auto;padding:0 28px}
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--card); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:50;
+  }
+  header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--blue)}
+  .hrow{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;max-width:1560px;margin:0 auto;gap:20px}
+  .htitle{font-size:25px;font-weight:800;letter-spacing:-.02em;margin:0}
+  .hsub{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .hright{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .chip{
+    display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:9px;
+    background:var(--alt);border:1px solid var(--border);font-size:12.5px;font-weight:600;color:var(--muted);
+    white-space:nowrap;
+  }
+  .chip.live{background:#dcfce7;border-color:#bbf7d0;color:#15803d}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(22,163,74,.18)}
+  .dot.busy{background:var(--amber);box-shadow:0 0 0 4px rgba(245,158,11,.18)}
+  .dot.err{background:var(--red);box-shadow:0 0 0 4px rgba(220,38,38,.18)}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid;gap:18px;margin-top:20px}
+  .kpis{grid-template-columns:repeat(6,1fr)}
+  .row3{grid-template-columns:repeat(3,1fr)}
+  .row-hb{grid-template-columns:1.5fr 1fr}
+  .row-tables{grid-template-columns:1fr 1fr 1.3fr}
+
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px 20px;position:relative;overflow:hidden;
+  }
+  .card h3{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .card .sub{font-size:11.5px;color:var(--faint);margin-top:3px}
+  .ctitle{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .ctitle::before{content:'';width:3px;height:16px;border-radius:2px;background:var(--blue);flex:none}
+  .ctitle.amber::before{background:var(--amber)} .ctitle.teal::before{background:var(--teal)}
+  .ctitle.purple::before{background:var(--purple)} .ctitle.green::before{background:var(--green)}
+
+  /* ---------- kpi ---------- */
+  .kpi{padding:16px 18px}
+  .kpi .lab{font-size:10px;font-weight:700;letter-spacing:.09em;color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:7px}
+  .kdot{width:7px;height:7px;border-radius:50%;flex:none}
+  .kpi .val{font-size:29px;font-weight:800;letter-spacing:-.03em;margin:10px 0 2px;line-height:1;font-variant-numeric:tabular-nums}
+  .kpi .unit{font-size:11.5px;color:var(--faint)}
+  .kpi .bar{height:4px;border-radius:3px;background:var(--track);margin-top:14px;overflow:hidden}
+  .kpi .bar i{display:block;height:100%;border-radius:3px}
+
+  .chart{width:100%;height:330px}
+  .chart.tall{height:360px}
+
+  /* ---------- gauge rows (phone) ---------- */
+  .gauge-row{display:flex;align-items:center;gap:14px;padding:6px 0;border-bottom:1px solid var(--border)}
+  .gauge-row:last-child{border-bottom:none}
+  .gauge-row .gwrap{width:118px;height:72px;flex:none}
+  .gauge-row .gmeta{flex:1;min-width:0}
+  .gauge-row .gname{font-size:13px;font-weight:700;color:var(--text)}
+  .gauge-row .gsub{font-size:11px;color:var(--faint);margin-top:2px}
+  .gauge-row .gval{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+  .gtrack{height:6px;border-radius:4px;background:var(--track);margin-top:7px;overflow:hidden}
+  .gtrack i{display:block;height:100%;border-radius:4px}
+
+  /* ---------- vehicle cards (phone) ---------- */
+  .vcard{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--alt)}
+  .vcard:last-child{margin-bottom:0}
+  .vhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .vhead b{font-size:14px}
+  .vhead .vdrv{font-size:11px;color:var(--faint);text-align:right}
+  .vstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .vstats div{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 8px;text-align:center}
+  .vstats span{display:block;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .vstats b{font-size:14px;font-variant-numeric:tabular-nums}
+
+  /* ---------- back to top ---------- */
+  #totop{position:fixed;right:16px;bottom:16px;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:18px;
+    box-shadow:var(--shadow);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:60}
+  #totop.on{display:flex}
+
+  /* ---------- tables ---------- */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{
+    text-align:left;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--blue-h);background:var(--blue-xl);padding:9px 11px;
+  }
+  thead th:first-child{border-radius:8px 0 0 8px}
+  thead th:last-child{border-radius:0 8px 8px 0;text-align:right}
+  thead th.num{text-align:right}
+  tbody td{padding:9px 11px;border-bottom:1px solid var(--border);color:#334155;font-variant-numeric:tabular-nums}
+  tbody tr:nth-child(even){background:var(--alt)}
+  tbody tr:last-child td{border-bottom:none}
+  tbody td:first-child{font-weight:600;color:var(--text)}
+  tbody td.num{text-align:right}
+  .dbar{position:relative}
+  .dbar i{position:absolute;left:6px;top:5px;bottom:5px;border-radius:4px;opacity:.16;z-index:0}
+  .dbar span{position:relative;z-index:1}
+
+  /* ---------- heatmap ---------- */
+  .hm{width:100%;border-collapse:separate;border-spacing:3px;font-size:11px}
+  .hm th{background:none;color:var(--faint);font-weight:600;font-size:10px;text-align:center;padding:2px 4px;letter-spacing:0}
+  .hm th.rowh{text-align:left;color:var(--muted);font-weight:700;white-space:nowrap;padding-right:10px}
+  .hm td{text-align:center;border-radius:5px;padding:7px 4px;color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+  .hm td.empty{background:var(--alt);color:transparent}
+
+  footer{margin-top:26px;font-size:11.5px;color:var(--faint);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .err-banner{display:none;margin-top:16px;padding:12px 16px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px}
+  .err-banner.on{display:block}
+
+  @media(max-width:1240px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .row3{grid-template-columns:1fr 1fr}
+    .row-tables{grid-template-columns:1fr 1fr}
+    .row-hb{grid-template-columns:1fr}
+  }
+  @media(max-width:820px){
+    .wrap{padding:0 14px}
+    .hrow{padding:14px}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .row3{grid-template-columns:1fr}
+    .row-tables{grid-template-columns:1fr}
+    .htitle{font-size:20px}
+  }
+
+  /* ============ PHONE (<640px) ============ */
+  @media(max-width:640px){
+    body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+    .wrap{padding:0 12px;padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
+    .hrow{padding:12px 14px;gap:10px;flex-wrap:wrap}
+    .htitle{font-size:18px}
+    .hsub{display:none}
+    .hright{width:100%;gap:8px}
+    .chip{height:30px;padding:0 11px;font-size:11.5px;flex:1;justify-content:center}
+
+    .grid{gap:12px;margin-top:14px}
+    .kpis{grid-template-columns:repeat(2,1fr);gap:10px}
+    .card{padding:14px;border-radius:14px}
+
+    /* taller, readable KPI cards */
+    .kpi{padding:13px 14px}
+    .kpi .lab{font-size:9.5px;letter-spacing:.06em}
+    .kpi .val{font-size:24px;margin:8px 0 2px}
+    .kpi .unit{font-size:10.5px}
+    .kpi .bar{margin-top:11px}
+
+    /* charts: shorter so the page isn't absurdly long */
+    .chart{height:250px}
+    .chart.tall{height:270px}
+
+    /* tables: tighter, hide low-priority columns */
+    table{font-size:12px}
+    thead th{padding:8px 8px;font-size:9.5px}
+    tbody td{padding:8px 8px}
+    .hide-sm{display:none}
+
+    /* heatmap: transpose -> months as rows, fewer columns */
+    .hm{font-size:10px;border-spacing:2px}
+    .hm th{font-size:9px;padding:2px 3px}
+    .hm td{padding:6px 3px}
+
+    footer{margin-top:18px;flex-direction:column;gap:6px;font-size:11px}
+    .err-banner{font-size:12px;padding:10px 12px}
+  }
+  @media(max-width:380px){
+    .kpi .val{font-size:21px}
+    .card{padding:12px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div>
+      <h1 class="htitle">Painel de Frota</h1>
+      <div class="hsub">Boletim de Viaturas · AOV — leitura automática da folha <b>query</b></div>
+    </div>
+    <div class="hright">
+      <span class="chip" id="period">—</span>
+      <span class="chip live" id="status"><span class="dot busy"></span> a carregar…</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="err-banner" id="errb"></div>
+
+  <!-- KPI strip -->
+  <div class="grid kpis" id="kpis"></div>
+
+  <!-- gauges + combo -->
+  <div class="grid row3">
+    <div class="card">
+      <div class="ctitle green"><div><h3>Eficiência operacional</h3><div class="sub">Indicadores em escala 0–100</div></div></div>
+      <div id="gauges" style="height:250px"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle amber"><div><h3>Energia e viagens por mês</h3><div class="sub">Barras = kWh · Linha = viagens</div></div></div>
+      <div id="combo" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle purple"><div><h3>Perfil por viatura</h3><div class="sub">Comparação normalizada (0–100)</div></div></div>
+      <div id="radar" class="chart" style="height:300px"></div>
+    </div>
+  </div>
+
+  <!-- heatmap + table -->
+  <div class="grid row3">
+    <div class="card">
+      <div class="ctitle amber"><div><h3>Energia por rede</h3><div class="sub">MOBI.E (Frota) vs VOLTE.E (Exército)</div></div></div>
+      <div id="network" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle teal"><div><h3>Postos de carregamento</h3><div class="sub">sessões × energia · tamanho = kWh/sessão</div></div></div>
+      <div id="bubble" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle teal"><div><h3>Top postos</h3><div class="sub">Por energia acumulada</div></div></div>
+      <div id="stations"></div>
+    </div>
+  </div>
+
+  <div class="grid row3 row-tables">
+    <div class="card">
+      <div class="ctitle"><div><h3>Por viatura</h3><div class="sub">Detalhe por matrícula</div></div></div>
+      <div id="veh"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle teal"><div><h3>Por mês</h3><div class="sub">Viagens e energia</div></div></div>
+      <div id="months"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle teal"><div><h3>Mapa de calor — posto × mês (kWh)</h3><div class="sub">Intensidade de carregamento</div></div></div>
+      <div id="heat"></div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Fonte: Google Sheets · folha <b>query</b> — atualiza a cada carregamento da página.</span>
+    <span id="stamp"></span>
+  </footer>
+</div>
+
+<script>
+/* =========================================================================
+   Config
+   ========================================================================= */
+const SHEET_ID = '1s7cHd4g2F9RC0WwRGlRtm4eqAoxXaXPiKmoqwK2J22g';
+const SHEET_NAME = 'query';
+// Fallback snapshot (last known good) so the page still renders if offline.
+const FALLBACK_CSV_URL = 'query-fallback.csv';
+
+const C = {
+  blue:'#2563eb', blueH:'#3b82f6', blueXl:'#eff6ff', blueL:'#dbeafe',
+  amber:'#f59e0b', amberL:'#fef3c7', teal:'#0d9488', tealL:'#ccfbf1',
+  green:'#16a34a', purple:'#7c3aed', red:'#dc2626',
+  text:'#0f172a', muted:'#64748b', faint:'#94a3b8', border:'#e2e8f0', track:'#eef2f6', alt:'#f8fafc'
+};
+const PALETTE = [C.blue, C.amber, C.teal, C.purple, C.green, '#0ea5e9', '#f43f5e', '#8b5cf6', '#14b8a6', '#eab308'];
+
+/* =========================================================================
+   Helpers
+   ========================================================================= */
+const $ = (s) => document.querySelector(s);
+const num = (x) => (typeof x === 'number' && isFinite(x)) ? x : 0;
+const fmt = (x, d=0) => num(x).toLocaleString('pt-PT', {minimumFractionDigits:d, maximumFractionDigits:d});
+const MONTHS_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const pad = (n) => String(n).padStart(2,'0');
+
+// Sync contract (RegistoEV app, test-branch-2+): chargeType values
+const CT = { MOBI:'Rede MOBI.E', EXERCITO:'Rede Exército', PORTATIL:'Portátil', NENHUM:'Nenhum' };
+
+function monthKey(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1); }
+function monthLabel(key){ const [y,m]=key.split('-'); return MONTHS_PT[+m-1] + '/' + y.slice(2); }
+
+/* ---- CSV fallback parser ---- */
+function parseCSV(text){
+  const rows=[]; let i=0, row=[], cell='', q=false;
+  while(i<text.length){
+    const ch=text[i];
+    if(q){
+      if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i+=2;continue;} q=false;i++;continue; }
+      cell+=ch;i++;continue;
+    }
+    if(ch==='"'){q=true;i++;continue;}
+    if(ch===','){row.push(cell);cell='';i++;continue;}
+    if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';i++;continue;}
+    if(ch==='\r'){i++;continue;}
+    cell+=ch;i++;
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  return rows;
+}
+
+/* ---- normalise raw rows into records ---- */
+function toRecords(rows){
+  const out=[];
+  for(const r of rows){
+    if(!r || r.length===0) continue;
+    const mat = (r[0]==null?'':String(r[0])).trim();
+    if(!mat) continue;
+    const dateStr = r[9]||'';
+    const d = parseDate(dateStr);
+    const volte = num(r[4]), mobi = num(r[5]);
+    // chargeType inference: the Sheet splits kWh into two columns.
+    //   kWh - VOLTE.E (Exército) -> "Rede Exército"
+    //   kWh - MOBI.E (Frota)     -> "Rede MOBI.E"
+    //   no kWh at all            -> "Nenhum" (a movement, not a charge)
+    let chargeType = CT.NENHUM;
+    if(volte>0) chargeType = CT.EXERCITO;
+    else if(mobi>0) chargeType = CT.MOBI;
+    const kwh = volte+mobi;
+    out.push({
+      mat,
+      volte,
+      mobi,
+      kwh,
+      chargeType,
+      hasKwh: kwh > 0,
+      isMobi: mobi>0,
+      isExercito: volte>0,
+      posto: (r[6]==null?'':String(r[6])).trim(),
+      litros:num(r[7]),
+      odom:  (r[8]===''||r[8]==null)?null:num(r[8]),
+      date:  d,
+      cond:  (r[10]==null?'':String(r[10])).trim(),
+      seq:   num(r[11]),
+    });
+  }
+  return out;
+}
+function parseDate(s){
+  if(!s) return null;
+  // gviz CSV gives locale strings like 4/29/2026 (US) — try ISO then US then EU
+  let m;
+  if((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))){
+    let a=+m[1], b=+m[2], y=+m[3];
+    // ambiguous: sheet locale is US → month/day. If a>12 it's day/month.
+    let mo = a>12 ? b : a, da = a>12 ? a : b;
+    return new Date(y, mo-1, da);
+  }
+  const dd=new Date(s); return isNaN(dd)?null:dd;
+}
+
+/* =========================================================================
+   Metrics
+   ========================================================================= */
+function compute(rec){
+  const veh={}, st={}, mon={};
+  let kwh=0, lit=0, dist=0, sess=0, sessStation=0, trips=0;
+  let mobi=0, exercito=0, nCharges=0, nMoves=0;
+  const dates=[];
+  for(const r of rec){
+    trips++;                       // every line is a movement/registro
+    if(r.odom!=null) dates.push(r.date);
+
+    // --- charging ---
+    if(r.hasKwh){
+      nCharges++;                  // "Carregamentos"
+      sess++;
+      kwh += r.kwh;
+      if(r.isMobi) mobi += r.mobi;
+      if(r.isExercito) exercito += r.volte;
+    } else {
+      nMoves++;                    // "Movimentos" (trip without charge)
+    }
+    lit += r.litros;
+    if(r.posto) sessStation++;
+
+    const v = veh[r.mat] || (veh[r.mat]={mat:r.mat,kwh:0,litros:0,sess:0,mobi:0,exercito:0,charges:0,moves:0,odMin:null,odMax:null,cond:new Set(),trips:0});
+    v.trips++;
+    v.kwh += r.kwh; v.litros += r.litros;
+    if(r.hasKwh){ v.charges++; v.sess++; if(r.isMobi) v.mobi+=r.mobi; if(r.isExercito) v.exercito+=r.volte; } else v.moves++;
+    if(r.odom!=null){ v.odMin = v.odMin==null?r.odom:Math.min(v.odMin,r.odom); v.odMax = v.odMax==null?r.odom:Math.max(v.odMax,r.odom); }
+    if(r.cond) v.cond.add(r.cond);
+    if(r.posto){
+      const s = st[r.posto] || (st[r.posto]={posto:r.posto,kwh:0,sess:0,exercito:0,mobi:0});
+      s.kwh += r.kwh; s.sess++;
+      if(r.isMobi) s.mobi += r.mobi;
+      if(r.isExercito) s.exercito += r.volte;
+    }
+    if(r.date){
+      if(!r.hasKwh && r.odom==null) { /* keep row even without date */ }
+      const k = monthKey(r.date);
+      const m = mon[k] || (mon[k]={key:k,trips:0,kwh:0,sess:0,charges:0,moves:0,mobi:0,exercito:0,dates:new Set()});
+      m.trips++;
+      if(r.hasKwh){ m.kwh += r.kwh; m.sess++; m.charges++; if(r.isMobi) m.mobi+=r.mobi; if(r.isExercito) m.exercito+=r.volte; }
+      else m.moves++;
+      m.dates.add(r.date.toDateString());
+    }
+  }
+  for(const k in veh){ const v=veh[k];
+    v.dist = (v.odMin!=null && v.odMax!=null) ? v.odMax-v.odMin : 0;
+    v.condList = [...v.cond].sort(); v.cond = v.condList.join(', ');
+  }
+  dist = Object.values(veh).reduce((a,v)=>a+v.dist,0);
+  const cons = dist ? kwh/dist*100 : 0;
+  dates.sort((a,b)=>a-b);
+  const dmin = dates[0], dmax = dates[dates.length-1];
+  const months = Object.keys(mon).sort();
+  const activeDays = new Set(dates.map(d=>d.toDateString())).size;
+  const spanDays = (dmin && dmax) ? Math.round((dmax-dmin)/864e5)+1 : 1;
+
+  // heatmap: station x month
+  const heat = {};
+  for(const r of rec){
+    if(r.posto && r.date){ const k=monthKey(r.date); ((heat[r.posto]||(heat[r.posto]={}))[k] ??= 0); heat[r.posto][k]+=r.kwh; }
+  }
+  const stations = Object.values(st).sort((a,b)=>b.kwh-a.kwh);
+
+  return {veh, st, mon, months, heat, stations, kwh, lit, dist, sess, sessStation, trips,
+          mobi, exercito, nCharges, nMoves,
+          cons, dmin, dmax, activeDays, spanDays, totalVehicles:Object.keys(veh).length};
+}
+
+/* =========================================================================
+   Responsive helpers
+   ========================================================================= */
+const MQ_PHONE = window.matchMedia('(max-width: 640px)');
+const isPhone = () => MQ_PHONE.matches;
+
+/* =========================================================================
+   Gauges (ECharts)
+   ========================================================================= */
+function gaugeChart(el, items){
+  const color = (v)=> v>=80?C.green : v>=50?C.amber : C.red;
+  const charts=[];
+  const host = document.getElementById(el);
+  host.innerHTML='';
+  host.__charts = charts;
+
+  if(isPhone()){
+    // one row per indicator: small dial + name + value + bar
+    host.style.display='block';
+    host.style.height='auto';
+    items.forEach((it)=>{
+      const col = it.color || color(it.value);
+      const row = document.createElement('div');
+      row.className='gauge-row';
+      row.innerHTML = `
+        <div class="gwrap"></div>
+        <div class="gmeta">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+            <span class="gname">${it.title}</span>
+            <span class="gval" style="color:${col}">${Math.round(it.value)}%</span>
+          </div>
+          <div class="gsub">${it.sub||''}</div>
+          <div class="gtrack"><i style="width:${Math.max(2,it.value).toFixed(1)}%;background:${col}"></i></div>
+        </div>`;
+      host.appendChild(row);
+      const ch = echarts.init(row.querySelector('.gwrap'));
+      ch.setOption({
+        series:[{
+          type:'gauge', startAngle:180, endAngle:0, min:0, max:100,
+          radius:'100%', center:['50%','88%'],
+          progress:{show:true,width:9,roundCap:true,itemStyle:{color:col}},
+          axisLine:{lineStyle:{width:9,color:[[1,C.track]]}},
+          pointer:{show:false},axisTick:{show:false},splitLine:{show:false},axisLabel:{show:false},anchor:{show:false},
+          detail:{show:false}, title:{show:false},
+          data:[{value:it.value}]
+        }]
+      });
+      charts.push(ch);
+    });
+    return charts;
+  }
+
+  // desktop / tablet: dials side by side
+  host.style.display='grid';
+  host.style.gridTemplateColumns='repeat('+items.length+',1fr)';
+  host.style.gap='4px';
+  items.forEach((it,i)=>{
+    const d=document.createElement('div');
+    d.style.height='240px'; host.appendChild(d);
+    const ch=echarts.init(d);
+    ch.setOption({
+      series:[{
+        type:'gauge', startAngle:180, endAngle:0, min:0, max:100,
+        radius:'96%', center:['50%','76%'],
+        progress:{show:true, width:12, roundCap:true, itemStyle:{color:it.color||color(it.value)}},
+        axisLine:{lineStyle:{width:12, color:[[1,C.track]]}},
+        pointer:{show:false}, axisTick:{show:false}, splitLine:{show:false}, axisLabel:{show:false},
+        anchor:{show:false},
+        title:{show:true, offsetCenter:[0,'-38%'], fontSize:11, color:C.muted, fontWeight:700},
+        detail:{valueAnimation:true, offsetCenter:[0,'-8%'], fontSize:26, fontWeight:800, color:C.text,
+                formatter:(v)=>Math.round(v)+'%'},
+        data:[{value:it.value, name:it.title}]
+      }]
+    });
+    charts.push(ch);
+  });
+  return charts;
+}
+
+/* =========================================================================
+   Data load: JSONP to gviz, with CSV fallback
+   ========================================================================= */
+function loadJSONP(){
+  return new Promise((resolve,reject)=>{
+    const url = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+
+      '/gviz/tq?tqx=out:json&sheet='+encodeURIComponent(SHEET_NAME);
+    const s = document.createElement('script');
+    const to = setTimeout(()=>{ cleanup(); reject(new Error('timeout')); }, 12000);
+    let done=false;
+    function cleanup(){ clearTimeout(to); s.remove(); }
+    // gviz always calls google.visualization.Query.setResponse(...)
+    window.google = window.google || {};
+    window.google.visualization = window.google.visualization || {};
+    window.google.visualization.Query = window.google.visualization.Query || {};
+    const prev = window.google.visualization.Query.setResponse;
+    window.google.visualization.Query.setResponse = function(resp){
+      if(done) return; done=true;
+      try{
+        const norm = resp.table.rows.map(tr => tr.c.map(c=>{
+          if(c==null) return '';
+          if(typeof c.v==='string'){
+            const m=/^Date\((\d+),(\d+),(\d+)\)$/.exec(c.v);
+            if(m) return `${m[1]}-${pad(+m[2]+1)}-${pad(+m[3])}`;
+          }
+          return c.v;
+        }));
+        cleanup(); resolve(norm);
+      }catch(e){ cleanup(); reject(e); }
+      if(prev && prev!==window.google.visualization.Query.setResponse){ try{prev(resp);}catch(_){} }
+    };
+    s.onerror = ()=>{ cleanup(); reject(new Error('script error')); };
+    s.src = url;
+    document.head.appendChild(s);
+  });
+}
+async function loadCSV(url){
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const rows = parseCSV(await r.text());
+  rows.shift(); // header
+  return rows;
+}
+
+/* =========================================================================
+   Render
+   ========================================================================= */
+function renderKpis(M){
+  const items = [
+    {lab:'Distância', val:fmt(M.dist), unit:'km', color:C.blue, ratio:.82},
+    {lab:'Energia', val:fmt(M.kwh,1), unit:'kWh', color:C.amber, ratio:.74},
+    {lab:'Consumo', val:fmt(M.cons,1), unit:'kWh/100 km', color:C.teal, ratio:.66},
+    {lab:'Carregamentos', val:fmt(M.nCharges), unit:'eventos', color:C.blue, ratio:.57},
+    {lab:'Movimentos', val:fmt(M.nMoves), unit:'viagens sem carga', color:C.purple, ratio:.44},
+    {lab:'Viaturas', val:fmt(M.totalVehicles), unit:'ativas', color:C.green, ratio:1},
+  ];
+  $('#kpis').innerHTML = items.map(i=>`
+    <div class="card kpi">
+      <div class="lab"><span class="kdot" style="background:${i.color}"></span>${i.lab}</div>
+      <div class="val">${i.val}</div>
+      <div class="unit">${i.unit}</div>
+      <div class="bar"><i style="width:${(i.ratio*100).toFixed(0)}%;background:${i.color}"></i></div>
+    </div>`).join('');
+}
+
+function renderGauges(M){
+  const elet = (M.kwh+M.lit) ? M.kwh/(M.kwh+M.lit)*100 : 100;
+  const util = Math.min(100, M.activeDays/Math.max(1,M.spanDays)*100);
+  const intens = M.dist ? Math.min(100, M.cons/25*100) : 0;
+  gaugeChart('gauges', [
+    {title:'Eletrificação', value:elet, color:C.green, sub:'Energia elétrica vs combustível'},
+    {title:'Utilização',    value:util, color:C.blue, sub:`${M.activeDays} de ${M.spanDays} dias com registo`},
+    {title:'Intensidade',   value:intens, color:C.amber, sub:`${fmt(M.cons,1)} kWh/100 km (escala 0–25)`},
+  ]);
+}
+
+function renderCombo(M){
+  const ch = echarts.init($('#combo'));
+  const x = M.months.map(monthLabel);
+  const mobi = M.months.map(k=>M.mon[k].mobi);
+  const exer = M.months.map(k=>M.mon[k].exercito);
+  const vg   = M.months.map(k=>M.mon[k].trips);
+  ch.setOption({
+    grid:{left:44,right:46,top:32,bottom:34},
+    tooltip:{trigger:'axis'},
+    legend:{bottom:0,textStyle:{color:C.muted,fontSize:10},itemWidth:10,itemHeight:10},
+    xAxis:{type:'category',data:x,axisLine:{lineStyle:{color:C.border}},axisTick:{show:false},
+           axisLabel:{color:C.faint,fontSize:11}},
+    yAxis:[
+      {type:'value',name:'kWh',nameTextStyle:{color:C.faint,fontSize:10},axisLabel:{color:C.faint,fontSize:10},
+       splitLine:{lineStyle:{color:C.track}},axisLine:{show:false}},
+      {type:'value',name:'viagens',nameTextStyle:{color:C.faint,fontSize:10},axisLabel:{color:C.faint,fontSize:10},
+       splitLine:{show:false},axisLine:{show:false}}
+    ],
+    series:[
+      {name:'MOBI.E',type:'bar',stack:'e',data:mobi,barWidth:'50%',itemStyle:{color:C.amber}},
+      {name:'VOLTE.E',type:'bar',stack:'e',data:exer,barWidth:'50%',itemStyle:{color:C.blue,borderRadius:[4,4,0,0]}},
+      {name:'Viagens',type:'line',yAxisIndex:1,data:vg,symbolSize:7,
+       lineStyle:{color:C.purple,width:2.5},itemStyle:{color:C.purple,borderColor:'#fff',borderWidth:2}}
+    ]
+  });
+  return ch;
+}
+
+function renderRadar(M){
+  const names = Object.keys(M.veh).sort();
+  const metrics = ['Viagens','Distância','Energia','Sessões','Eficiência'];
+  const raw = names.map(n=>{
+    const v=M.veh[n];
+    return [v.trips, v.dist, v.kwh, v.sess, (v.kwh? v.dist/v.kwh*100 : 0)];
+  });
+  const mx = metrics.map((_,i)=>Math.max(...raw.map(r=>r[i]))||1);
+  const indicator = metrics.map((m,i)=>({name:m, max:100}));
+  const ch = echarts.init($('#radar'));
+  ch.setOption({
+    tooltip:{},
+    legend:{bottom:0, textStyle:{color:C.muted,fontSize:11}, itemWidth:10, itemHeight:10},
+    radar:{
+      indicator, radius:'62%', center:['50%','46%'],
+      axisName:{color:C.muted,fontSize:10.5},
+      splitLine:{lineStyle:{color:C.track}}, splitArea:{show:false},
+      axisLine:{lineStyle:{color:C.track}}
+    },
+    series:[{
+      type:'radar', symbolSize:5,
+      data: names.map((n,i)=>({
+        name:n, value: raw[i].map((v,j)=>+(v/mx[j]*100).toFixed(1)),
+        lineStyle:{color:PALETTE[i],width:2}, itemStyle:{color:PALETTE[i]},
+        areaStyle:{color:PALETTE[i],opacity:.14}
+      }))
+    }]
+  });
+  return ch;
+}
+
+function renderNetwork(M){
+  const ch = echarts.init($('#network'));
+  const mobi = M.mobi, exer = M.exercito;
+  ch.setOption({
+    tooltip:{trigger:'item',formatter:(p)=>`<b>${p.name}</b><br>${fmt(p.value,1)} kWh (${p.percent}%)`},
+    legend:{bottom:0,textStyle:{color:C.muted,fontSize:11},itemWidth:10,itemHeight:10},
+    series:[{
+      type:'pie', radius:['46%','72%'], center:['50%','42%'],
+      avoidLabelOverlap:true,
+      itemStyle:{borderColor:'#fff',borderWidth:3,borderRadius:5},
+      label:{show:true,formatter:'{d}%',color:C.muted,fontSize:11,fontWeight:600},
+      data:[
+        {value:+mobi.toFixed(1), name:'MOBI.E · Frota', itemStyle:{color:C.amber}},
+        {value:+exer.toFixed(1), name:'VOLTE.E · Exército', itemStyle:{color:C.blue}}
+      ]
+    }]
+  });
+  return ch;
+}
+
+function renderBubble(M){
+  const top = M.stations.slice(0,12);
+  const data = top.map(s=>({name:s.posto, value:[s.sess, +s.kwh.toFixed(1), +((s.sess? s.kwh/s.sess:0)).toFixed(1)]}));
+  const sizes = data.map(d=>d.value[2]);
+  const smin=Math.min(...sizes), smax=Math.max(...sizes);
+  const ch = echarts.init($('#bubble'));
+  ch.setOption({
+    grid:{left:50,right:24,top:24,bottom:44},
+    tooltip:{formatter:(p)=>`<b>${p.data.name}</b><br>${p.value[0]} sessões<br>${fmt(p.value[1],1)} kWh<br>${fmt(p.value[2],1)} kWh/sessão`},
+    xAxis:{type:'value',name:'sessões',nameLocation:'middle',nameGap:26,nameTextStyle:{color:C.faint,fontSize:10},
+           axisLabel:{color:C.faint,fontSize:10},splitLine:{lineStyle:{color:C.track}}},
+    yAxis:{type:'value',name:'kWh',nameTextStyle:{color:C.faint,fontSize:10},
+           axisLabel:{color:C.faint,fontSize:10},splitLine:{lineStyle:{color:C.track}}},
+    series:[{
+      type:'scatter',
+      data,
+      symbolSize:(v)=> 10 + (v[2]-smin)/Math.max(1,smax-smin) * 32,
+      itemStyle:{color:C.amber,opacity:.45,borderColor:C.amber,borderWidth:1.5},
+      label:{show:true,formatter:(p)=>p.data.name,position:'top',color:C.muted,fontSize:10}
+    }]
+  });
+  return ch;
+}
+
+function renderStations(M){
+  const top = M.stations.slice(0,10);
+  const mx = top[0]?.kwh||1;
+  if(isPhone()){
+    // Posto + energia on one line, sessões as a small meta line (2 visual columns)
+    $('#stations').innerHTML = `<table>
+      <thead><tr><th>Posto</th><th class="num">Energia</th></tr></thead>
+      <tbody>${top.map(s=>`
+        <tr><td>${s.posto}<div style="font-weight:400;color:var(--faint);font-size:10.5px">${s.sess} sessões</div></td>
+        <td class="num dbar"><i style="width:${(s.kwh/mx*88).toFixed(0)}%;background:${C.amber}"></i><span>${fmt(s.kwh,1)}</span></td></tr>`).join('')}</tbody>
+    </table>`;
+    return;
+  }
+  $('#stations').innerHTML = `<table>
+    <thead><tr><th>Posto</th><th class="num">Energia</th><th class="num">Sessões</th></tr></thead>
+    <tbody>${top.map(s=>`
+      <tr><td>${s.posto}</td>
+      <td class="num dbar"><i style="width:${(s.kwh/mx*88).toFixed(0)}%;background:${C.amber}"></i><span>${fmt(s.kwh,1)}</span></td>
+      <td class="num">${s.sess}</td></tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function renderVehicles(M){
+  const names = Object.keys(M.veh).sort();
+  if(isPhone()){
+    // one card per vehicle (5 columns don't fit a phone)
+    $('#veh').innerHTML = `<div>${names.map(n=>{
+      const v=M.veh[n]; const ef=v.kwh? v.dist/v.kwh*100:0;
+      return `<div class="vcard">
+        <div class="vhead"><b>${n}</b><span class="vdrv">${v.cond||'—'}</span></div>
+        <div class="vstats">
+          <div><span>Dist.</span><b>${fmt(v.dist)}</b></div>
+          <div><span>Energia</span><b>${fmt(v.kwh,1)}</b></div>
+          <div><span>km/100kWh</span><b>${fmt(ef,0)}</b></div>
+        </div>
+      </div>`;}).join('')}</div>`;
+    return;
+  }
+  $('#veh').innerHTML = `<table>
+    <thead><tr><th>Matrícula</th><th class="num">Dist.</th><th class="num">Energia</th><th class="num">Sessões</th><th class="num">km/100kWh</th></tr></thead>
+    <tbody>${names.map(n=>{const v=M.veh[n]; const ef=v.kwh? v.dist/v.kwh*100:0; return `
+      <tr><td>${n}<div style="font-weight:400;color:var(--faint);font-size:11px">${v.cond||'—'}</div></td>
+      <td class="num">${fmt(v.dist)}</td>
+      <td class="num">${fmt(v.kwh,1)}</td>
+      <td class="num">${v.sess}</td>
+      <td class="num">${fmt(ef,0)}</td></tr>`;}).join('')}</tbody>
+  </table>`;
+}
+
+function renderMonths(M){
+  const mx = Math.max(...M.months.map(k=>M.mon[k].kwh))||1;
+  $('#months').innerHTML = `<table>
+    <thead><tr><th>Mês</th><th class="num">Viagens</th><th class="num">Energia</th></tr></thead>
+    <tbody>${M.months.map(k=>{const m=M.mon[k]; return `
+      <tr><td>${monthLabel(k)}</td><td class="num">${m.trips}</td>
+      <td class="num dbar"><i style="width:${(m.kwh/mx*88).toFixed(0)}%;background:${C.teal}"></i><span>${fmt(m.kwh,1)}</span></td></tr>`;}).join('')}</tbody>
+  </table>`;
+}
+
+function renderHeat(M){
+  const phone = isPhone();
+  // Phone: transpose -> months as rows, only the top stations as columns
+  const rows = phone ? M.stations.slice(0,5) : M.stations.slice(0,10);
+  const cols = M.months;
+  const vals = rows.flatMap(s=>cols.map(k=>(M.heat[s.posto]||{})[k]||0)).filter(v=>v>0).sort((a,b)=>a-b);
+  // percentile-based scale (p10..p95) so mid values differentiate well
+  const q=(p)=>{ if(!vals.length) return 1; const i=Math.min(vals.length-1, Math.max(0, Math.round((vals.length-1)*p))); return vals[i]; };
+  const lo=q(0.10)||1, hi=q(0.95)||1;
+  const scale=(v)=>{ const t=Math.min(1, Math.max(0, (Math.log(1+v)-Math.log(1+lo))/(Math.log(1+hi)-Math.log(1+lo)||1))); return t; };
+  const cell=(v)=>{ if(v<=0) return `<td class="empty">·</td>`;
+      const t=scale(v); const op=(0.10+t*0.90).toFixed(2);
+      const txt = (v>=1) ? fmt(v,0) : '';
+      return `<td style="background:rgba(13,148,136,${op});color:${t>0.55?'#fff':'#0f766e'}" title="${fmt(v,1)} kWh">${txt}</td>`; };
+
+  if(phone){
+    // months down the side, top-5 stations across
+    const head = `<tr><th class="rowh"></th>${rows.map(s=>`<th>${s.posto.replace('-','‑')}</th>`).join('')}</tr>`;
+    const body = cols.map(k=>{
+      const cells = rows.map(s=>cell((M.heat[s.posto]||{})[k]||0)).join('');
+      return `<tr><th class="rowh">${monthLabel(k)}</th>${cells}</tr>`;
+    }).join('');
+    $('#heat').innerHTML = `<table class="hm">${head}${body}</table>`;
+    return;
+  }
+  const head = `<tr><th class="rowh"></th>${cols.map(k=>`<th>${monthLabel(k)}</th>`).join('')}</tr>`;
+  const body = rows.map(s=>{
+    const cells = cols.map(k=>cell((M.heat[s.posto]||{})[k]||0)).join('');
+    return `<tr><th class="rowh">${s.posto}</th>${cells}</tr>`;
+  }).join('');
+  $('#heat').innerHTML = `<table class="hm">${head}${body}</table>`;
+}
+
+/* =========================================================================
+   Boot
+   ========================================================================= */
+function setStatus(cls, text){
+  $('#status').innerHTML = `<span class="dot ${cls}"></span> ${text}`;
+}
+function showError(msg){
+  const b=$('#errb'); b.classList.add('on');
+  b.innerHTML = `<b>Não foi possível ler a folha «query» em direto.</b> ${msg}<br>
+    A mostrar a última cópia local (<code>query-fallback.csv</code>).`;
+}
+function renderAll(M){
+  window.__M = M;
+  renderKpis(M); renderGauges(M);
+  renderCombo(M); renderRadar(M); renderNetwork(M); renderBubble(M);
+  renderStations(M); renderVehicles(M); renderMonths(M); renderHeat(M);
+  if(M.dmin && M.dmax){
+    const f=(d)=>d.getDate()+' '+MONTHS_PT[d.getMonth()]+' '+d.getFullYear();
+    $('#period').textContent = f(M.dmin)+'  →  '+f(M.dmax);
+  }
+  $('#stamp').textContent = 'Atualizado: '+new Date().toLocaleString('pt-PT');
+  window.addEventListener('resize', resizeCharts);
+}
+
+/* resize every ECharts instance (debounced) */
+let __rz;
+function resizeCharts(){
+  clearTimeout(__rz);
+  __rz = setTimeout(()=>{
+    document.querySelectorAll('#combo,#radar,#network,#bubble,#gauges,#gauges > div,#gauges .gwrap').forEach(el=>{
+      const i = echarts.getInstanceByDom(el); if(i) i.resize();
+    });
+  }, 120);
+}
+
+/* re-render when crossing the phone breakpoint (e.g. rotate) */
+function onBreakpoint(){
+  if(!window.__M) return;
+  renderGauges(window.__M);
+  renderStations(window.__M);
+  renderVehicles(window.__M);
+  renderHeat(window.__M);
+  resizeCharts();
+  const t=$('#totop'); if(t) t.classList.toggle('on', window.scrollY > 600);
+}
+if(MQ_PHONE.addEventListener) MQ_PHONE.addEventListener('change', onBreakpoint);
+else if(MQ_PHONE.addListener) MQ_PHONE.addListener(onBreakpoint);
+
+/* back-to-top button (phone) */
+function initToTop(){
+  const b=document.createElement('button');
+  b.id='totop'; b.title='Voltar ao topo'; b.setAttribute('aria-label','Voltar ao topo');
+  b.innerHTML='\u2191';
+  b.addEventListener('click', ()=>window.scrollTo({top:0,behavior:'smooth'}));
+  document.body.appendChild(b);
+  window.addEventListener('scroll', ()=>{ b.classList.toggle('on', window.scrollY > 600); }, {passive:true});
+}
+
+(async function boot(){
+  let rows=null, live=false;
+  try{
+    const raw = await loadJSONP();
+    rows = raw; live = true;
+  }catch(e){
+    console.warn('live load failed', e);
+  }
+  if(!rows){
+    try{ rows = await loadCSV(FALLBACK_CSV_URL); showError('(cópia local)'); }
+    catch(e){ setStatus('err','sem dados'); showError('Sem acesso à Internet nem cópia local disponível.'); return; }
+  }
+  const M = compute(toRecords(rows));
+  renderAll(M);
+  initToTop();
+  setStatus(live?'':'busy', live? 'em direto · '+M.trips+' registos · '+M.nCharges+' carregamentos' : 'cópia local · '+M.trips+' registos');
+})();
+</script>
+</body>
+</html>

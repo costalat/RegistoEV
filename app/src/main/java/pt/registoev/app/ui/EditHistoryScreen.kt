@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.registoev.app.data.EvChargeEntity
@@ -27,11 +27,11 @@ import java.util.*
 fun EditHistoryScreen(
     charges: List<EvChargeEntity>,
     onEditClick: (EvChargeEntity) -> Unit,
-    onDeleteSelected: (List<Long>) -> Unit
+    onDeleteSelected: (List<Long>) -> Unit,
 ) {
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
-    var isSelectionMode by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var isSelectionMode by remember { mutableStateOf(value = false) }
+    var showDeleteConfirm by remember { mutableStateOf(value = false) }
 
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
@@ -39,10 +39,12 @@ fun EditHistoryScreen(
         charges.sortedWith(
             compareByDescending<EvChargeEntity> { 
                 val cal = Calendar.getInstance().apply { timeInMillis = it.date }
-                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 cal.timeInMillis 
-            }.thenByDescending { it.odometer }
+            }.thenByDescending { it.odometer },
         )
     }
 
@@ -92,7 +94,7 @@ fun EditHistoryScreen(
 
                         Row {
                             IconButton(onClick = { 
-                                selectedIds = if (selectedIds.size == charges.size) emptySet() else charges.map { it.id }.toSet()
+                                selectedIds = if (selectedIds.size == charges.size) emptySet() else charges.asSequence().map { it.id }.toSet()
                             }) {
                                 Icon(Icons.Default.SelectAll, null, tint = Color.White)
                             }
@@ -241,25 +243,12 @@ fun EditCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = charge.origin,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
+                        text = "${charge.origin} → ${charge.destination}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = Color.DarkGray,
-                        modifier = Modifier.padding(horizontal = 12.dp).size(18.dp)
-                    )
-                    Text(
-                        text = charge.destination,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                 }
@@ -271,7 +260,7 @@ fun EditCard(
                 ) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "${charge.odometer}",
+                            text = charge.odometer.toString(),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
                             color = Color.White,

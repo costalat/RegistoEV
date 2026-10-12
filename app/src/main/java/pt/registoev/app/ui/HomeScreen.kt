@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,15 +28,19 @@ fun KmHistoryScreen(charges: List<EvChargeEntity>) {
     // Ordenar primeiro por Dia (ignorando hora) e depois por Odómetro para garantir coerência
     val sortedCharges = charges.sortedWith(
         compareBy<EvChargeEntity> { 
-            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
-            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = it.date
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
             cal.timeInMillis 
-        }.thenBy { it.odometer }
+        }.thenBy { it.odometer },
     )
     
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         item {
             DashboardSection(charges = charges)
@@ -101,6 +106,39 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                    val hasAbastecimento = charge.chargeType != "Nenhum"
+                    val displayText = if (charge.localidade.isNotBlank()) charge.localidade else if (hasAbastecimento) charge.chargeType else ""
+
+                    if (displayText.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            val iconInfo = when (charge.chargeType) {
+                                "Combustível" -> Icons.Default.LocalGasStation to Color(0xFFFFB300)
+                                "Portátil" -> Icons.Default.Bolt to Color(0xFFFFB300)
+                                "Rede MOBI.E" -> Icons.Default.Bolt to Color(0xFF26C6DA)
+                                "Rede VOLTE.E" -> Icons.Default.Bolt to Color(0xFF046A38)
+                                else -> if (hasAbastecimento) Icons.Default.Bolt to Color(0xFF2196F3) else null
+                            }
+                            iconInfo?.let { (icon, tint) ->
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = tint,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            val labelColor = if (charge.chargeType == "Combustível") Color(0xFFFFB300) else Color(0xFF2196F3)
+                            Text(
+                                text = displayText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = labelColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
                 
                 // Valor em destaque no canto superior direito (Estilo iOS)
@@ -140,7 +178,10 @@ fun KmItem(charge: EvChargeEntity, diff: Int?) {
 
 @Composable
 fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
-    val chargeRecords = charges.filter { it.chargeType != "Nenhum" }.sortedByDescending { it.odometer }
+    val chargeRecords = charges.asSequence()
+        .filter { it.chargeType != "Nenhum" && it.chargeType != "Combustível" }
+        .sortedByDescending { it.odometer }
+        .toList()
     
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -151,7 +192,7 @@ fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
 
         item {
             Text(
-                text = "HISTÓRICO DE CARGAS",
+                text = "HISTÓRICO DE CARGAS (ELÉTRICO)",
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 color = Color.Gray,
@@ -171,7 +212,134 @@ fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
             }
         }
         
-        item { Spacer(modifier = Modifier.height(100.dp)) }
+        item { Spacer(modifier = Modifier.height(110.dp)) }
+    }
+}
+
+@Composable
+fun FuelHistoryScreen(charges: List<EvChargeEntity>) {
+    val fuelRecords = charges.asSequence()
+        .filter { it.chargeType == "Combustível" }
+        .sortedByDescending { it.odometer }
+        .toList()
+    
+    LazyColumn(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            // Reaproveitar dashboard ou secção de estatísticas se necessário, ou apenas cabeçalho
+            Text(
+                text = "HISTÓRICO DE ABASTECIMENTOS",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                color = Color.Gray,
+                letterSpacing = 1.sp
+            )
+        }
+        
+        if (fuelRecords.isEmpty()) {
+            item {
+                EmptyState("Sem abastecimentos registados.")
+            }
+        } else {
+            items(fuelRecords) { record ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    FuelHistoryItem(record)
+                }
+            }
+        }
+        
+        item { Spacer(modifier = Modifier.height(110.dp)) }
+    }
+}
+
+@Composable
+fun FuelHistoryItem(charge: EvChargeEntity) {
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(22.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ABASTECIMENTO",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = charge.localidade.ifEmpty { "Local não especificado" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
+                Text(
+                    text = dateFormat.format(Date(charge.date)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.03f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocalGasStation,
+                        contentDescription = null,
+                        tint = Color(0xFFFFB300),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Fóssil / Combustível",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.LightGray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                Row(verticalAlignment = Alignment.Bottom) {
+                    val litersText = remember(charge.liters) { String.format(Locale.getDefault(), "%.1f", charge.liters ?: 0.0) }
+                    Text(
+                        text = litersText,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.W900,
+                        color = Color(0xFFFFB300),
+                        letterSpacing = (-0.5).sp
+                    )
+                    Text(
+                        text = " l",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFFFFB300).copy(alpha = 0.5f),
+                        modifier = Modifier.padding(bottom = 4.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -200,7 +368,7 @@ fun ChargeHistoryItem(charge: EvChargeEntity) {
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = charge.destination,
+                    text = charge.localidade,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
@@ -251,7 +419,7 @@ fun ChargeHistoryItem(charge: EvChargeEntity) {
                         )
                     }
 
-                    // Badge: Código do Posto (Independente - Design Identêntico)
+                    // Badge: Código do Posto (Independente - Design Idêntico)
                     if (charge.codPosto.isNotEmpty()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

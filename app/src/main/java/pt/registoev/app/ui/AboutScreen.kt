@@ -1,5 +1,6 @@
 package pt.registoev.app.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.registoev.app.R
@@ -27,132 +29,214 @@ fun AboutScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(1.dp))
         
-        // App Branding (Reajustado para 85dp - equilíbrio)
-        Surface(
+        // --- BRANDING HEADER (FOLLOWING REFERENCE IMAGE) ---
+        
+        Image(
+            painter = painterResource(id = R.drawable.about_logo),
+            contentDescription = "Registo EV Logo",
             modifier = Modifier
-                .size(85.dp)
-                .clip(RoundedCornerShape(22.dp)),
-            color = Color(0xFF1E1E1E)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = null,
-                    modifier = Modifier.size(38.dp),
-                    tint = Color(0xFF2196F3)
-                )
-            }
-        }
+                .size(160.dp) // Tamanho ajustado para visibilidade
+                .clip(RoundedCornerShape(28.dp)),
+        )
         
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         Text(
             text = "Registo EV",
-            style = MaterialTheme.typography.headlineMedium, // Restaurado
+            style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
         
         Text(
-            text = "Versão 1.4",
-            style = MaterialTheme.typography.bodySmall, // Restaurado
+            text = "Versão 1.8.2",
+            style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray
         )
         
-        Spacer(modifier = Modifier.height(24.dp)) // Mais equilibrado
+        Spacer(modifier = Modifier.height(40.dp))
         
-        // Main Description Card (Padding reajustado para 16dp)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) { 
-                Text(
-                    text = "Sobre a Aplicação",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "O Registo EV simplifica a gestão da mobilidade elétrica, permitindo o controlo rigoroso de consumos e quilometragem.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.LightGray,
-                    lineHeight = 20.sp
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Features Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Funcionalidades",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                BulletPoint("Registo de movimentos")
-                BulletPoint("Cálculo de kWh/100km")
-                BulletPoint("Gráficos de energia")
-                BulletPoint("Backup de dados")
-                BulletPoint("Exportação de relatórios")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Credits Card
+        // Mission Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-            shape = RoundedCornerShape(20.dp),
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AutoAwesome, 
+                        null, 
+                        tint = Color(0xFFFFD700), 
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Sobre a aplicação",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Equipa e Desenvolvimento",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF4CAF50),
+                    text = "O Registo EV simplifica a gestão da mobilidade elétrica, permitindo o rigoroso controlo de consumos e quilometragem.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    lineHeight = 22.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Features Card (NEWLY RESTORED)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "FUNCIONALIDADES CHAVE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                CreditItemWithCustomIcon(
-                    role = "Prova de conceito", 
-                    name = "Copilot Premium", 
-                    iconRes = R.drawable.ic_copilot
+                val features = listOf(
+                    "Registo de movimentos e quilometragem",
+                    "Cálculo automático de kWh/100km",
+                    "Gráficos de consumo e energia",
+                    "Backup e restauro de dados",
+                    "Exportação de relatórios mensais em PDF"
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f))
-                CreditItemWithCustomIcon(
-                    role = "Desenvolvimento", 
-                    name = "Gemini Pro", 
-                    iconRes = R.drawable.ic_gemini
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f))
-                CreditItemWithCustomIcon(
-                    role = "Especificação, revisão e controlo de qualidade",
-                    name = "TC",
-                    iconRes = R.drawable.ic_quality
-                )
+                
+                features.forEachIndexed { index, feature ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.CheckCircle, 
+                            null, 
+                            tint = Color(0xFF4CAF50), 
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = feature,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.LightGray
+                        )
+                    }
+                    if (index < features.lastIndex) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
         
-        Spacer(modifier = Modifier.height(110.dp)) // Espaço para a dock
+        // Changelog Card (NEW)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "NOVIDADES V1.8.2",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                ChangelogItem("Nuvem", "Sincronização automática e edição com Google Sheets.")
+                ChangelogItem("Combustível", "Novo suporte para litros e local de abastecimento.")
+                ChangelogItem("Interface", "Novo design premium, ícones 3D e navegação fluida.")
+                ChangelogItem("Relatórios", "PDFs melhorados com proteção de colunas.")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Credits Section
+        Text(
+            text = "EQUIPA DE DESENVOLVIMENTO",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.Gray,
+            modifier = Modifier.fillMaxWidth(),
+            letterSpacing = 1.5.sp
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                CreditItemWithCustomIcon("Especificação, revisão e controlo de qualidade", "TC", R.drawable.ic_quality)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+                CreditItemWithCustomIcon("Prova de conceito", "Copilot Premium", R.drawable.ic_copilot)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+                CreditItemWithCustomIcon("Apoio ao desenvolvimento", "Gemini Pro", R.drawable.ic_gemini)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+                CreditItemWithCustomIcon("Lista de postos de carregamento", "Alexandre Moreiro", R.drawable.posto_carregamento)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(120.dp))
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0x000000)
+@Composable
+fun AboutScreenPreview() {
+    MaterialTheme {
+        AboutScreen()
+    }
+}
+
+@Composable
+fun ChangelogItem(tag: String, text: String) {
+    Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            color = Color(0xFF2196F3).copy(alpha = 0.1f),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Text(
+                text = tag,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF2196F3),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.LightGray,
+            lineHeight = 18.sp
+        )
     }
 }
 
@@ -164,7 +248,7 @@ fun CreditItemWithCustomIcon(role: String, name: String, iconRes: Int) {
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp) // Equilibrado
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.05f)),
             contentAlignment = Alignment.Center
@@ -189,22 +273,5 @@ fun CreditItemWithCustomIcon(role: String, name: String, iconRes: Int) {
                 fontWeight = FontWeight.SemiBold
             )
         }
-    }
-}
-
-@Composable
-fun BulletPoint(text: String) {
-    Row(
-        modifier = Modifier.padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(5.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF4CAF50))
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(text = text, color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
     }
 }

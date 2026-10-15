@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
                                                         android.util.Log.d("RegistoEV_Sync", "A carregar para Cloud -> Matrícula: $vehiclePlate | Condutor: $driverName")
                                                         
                                                         scope.launch(Dispatchers.IO) {
-                                                            CloudSyncManager.syncRecord(entityToSync, vehiclePlate, driverName)
+                                                            CloudSyncManager.syncRecord(entityToSync, vehiclePlate, driverName, isEdit = (id != null))
                                                         }
                                                         
                                                         // Trigger API silenciosa se for código novo
@@ -224,12 +224,13 @@ class MainActivity : ComponentActivity() {
                                                     scope.launch { pagerState.animateScrollToPage(AppTab.NEW.ordinal) }
                                                 },
                                                 onDeleteSelected = { ids ->
+                                                    val itemsToDelete = charges.filter { it.id in ids }
                                                     scope.launch { 
                                                         dao.deleteByIds(ids)
-                                                        // Sincronização Cloud (Eliminar)
+                                                        // Sincronização Cloud (Eliminar por SyncID)
                                                         scope.launch(Dispatchers.IO) {
-                                                            ids.forEach { id ->
-                                                                CloudSyncManager.deleteRecord(id)
+                                                            itemsToDelete.forEach { charge ->
+                                                                CloudSyncManager.deleteRecord(charge)
                                                             }
                                                         }
                                                     }

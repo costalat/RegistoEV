@@ -14,7 +14,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object CloudSyncManager {
-    private const val GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4MNZfDu24sI8aDjJCE-XQjKuM8ZNoMGwPmux704UnwbSJDlh55NmqFfnOoglSObZ6Aw/exec"
+    private const val GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-EQjd6GX5uKI0Ig_tUlr2NtgzKJhUx95XPK8_DP6XEY73iriBZWD74gZ02kNGDH4xTA/exec"
     
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -27,6 +27,17 @@ object CloudSyncManager {
     private val gson = Gson()
 
     /**
+     * Gera uma chave de sincronização única por registo.
+     */
+    fun getSyncId(charge: EvChargeEntity): String {
+        return if (charge.id > 1000000000000L) {
+            charge.id.toString()
+        } else {
+            "${charge.date}_${charge.id}"
+        }
+    }
+
+    /**
      * Envia um registo para o Google Sheets com dados extras de perfil.
      * Inclui mapeamento duplo de chaves (Inglês e Português) para garantir
      * compatibilidade com o Google Apps Script.
@@ -35,12 +46,16 @@ object CloudSyncManager {
         charge: EvChargeEntity,
         plate: String = "",
         driver: String = "",
+        isEdit: Boolean = false,
     ): Boolean = withContext(Dispatchers.IO) {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val formattedDate = dateFormat.format(Date(charge.date))
+        val syncId = getSyncId(charge)
 
         val payload = mapOf(
-            "id" to charge.id,
+            "id" to syncId,
+            "syncId" to syncId,
+            "isEdit" to isEdit,
             // Mapeamento duplo para Origem
             "origin" to charge.origin,
             "origem" to charge.origin,
@@ -75,19 +90,13 @@ object CloudSyncManager {
         )
         
         val json = gson.toJson(payload)
-        android.util.Log.d("CloudSync", "A enviar payload: $json")
-
-        // Garantir explicitamente que os bytes são codificados em UTF-8
-        val body = json.toByteArray(Charsets.UTF_8).toRequestBody(JSON_TYPE)
-        val request = Request.Builder()
-            .url(GOOGLE_SCRIPT_URL)
-            .post(body)
-            .addHeader("Content-Type", "application/json; charset=utf-8")
-            .build()
+        android.util.Log.d("CloudSync", "A enviar payload SAVE (isEdit=$isEdit): $json")
 
         return@withContext try {
-            client.newCall(request).execute().use { response ->
+            executePostRequest(json).use { response ->
+                val responseText = response.body?.string() ?: ""
                 val isSuccess = response.isSuccessful
+                android.util.Log.d("CloudSync", "Resposta SAVE da nuvem (HTTP ${response.code}): $responseText")
                 if (!isSuccess) {
                     android.util.Log.e("CloudSync", "Erro na sincronização: ${response.code}")
                 }
@@ -100,27 +109,73 @@ object CloudSyncManager {
     }
 
     /**
-     * Envia um comando para eliminar um registo no Google Sheets.
+     * Executa um pedido POST com reencaminhamento manual mantendo o corpo JSON intacto.
      */
-    suspend fun deleteRecord(id: Long): Boolean = withContext(Dispatchers.IO) {
-        val payload = mapOf(
-            "id" to id,
-            "action" to "DELETE",
-        )
-        
-        val json = gson.toJson(payload)
-        android.util.Log.d("CloudSync", "A eliminar registo na nuvem -> ID: $id")
+    private fun executePostRequest(jsonPayload: String): okhttp3.Response {
+        val noRedirectClient = client.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
 
-        val body = json.toByteArray(Charsets.UTF_8).toRequestBody(JSON_TYPE)
-        val request = Request.Builder()
+        val bytes = jsonPayload.toByteArray(Charsets.UTF_8)
+        val body = bytes.toRequestBody(JSON_TYPE)
+        val initialRequest = Request.Builder()
             .url(GOOGLE_SCRIPT_URL)
             .post(body)
             .addHeader("Content-Type", "application/json; charset=utf-8")
             .build()
 
+        val response = noRedirectClient.newCall(initialRequest).execute()
+
+        if (response.code in 300..399) {
+            val redirectUrl = response.header("Location")
+            response.close()
+
+            if (!redirectUrl.isNullOrBlank()) {
+                android.util.Log.d("CloudSync", "A seguir reencaminhamento POST para: $redirectUrl")
+                val redirectedRequest = Request.Builder()
+                    .url(redirectUrl)
+                    .post(bytes.toRequestBody(JSON_TYPE))
+                    .addHeader("Content-Type", "application/json; charset=utf-8")
+                    .build()
+                return client.newCall(redirectedRequest).execute()
+            }
+        }
+        return response
+    }
+
+    /**
+     * Envia um comando para eliminar um registo no Google Sheets por entidade.
+     */
+    suspend fun deleteRecord(charge: EvChargeEntity): Boolean {
+        return deleteRecordBySyncId(getSyncId(charge))
+    }
+
+    /**
+     * Envia um comando para eliminar um registo no Google Sheets por ID numérico simples.
+     */
+    suspend fun deleteRecord(id: Long): Boolean = withContext(Dispatchers.IO) {
+        return@withContext deleteRecordBySyncId(id.toString())
+    }
+
+    /**
+     * Envia um comando para eliminar um registo no Google Sheets por SyncID.
+     */
+    suspend fun deleteRecordBySyncId(syncId: String): Boolean = withContext(Dispatchers.IO) {
+        val payload = mapOf(
+            "id" to syncId,
+            "syncId" to syncId,
+            "action" to "DELETE",
+        )
+        
+        val json = gson.toJson(payload)
+        android.util.Log.d("CloudSync", "A eliminar registo na nuvem -> SyncID: $syncId")
+
         return@withContext try {
-            client.newCall(request).execute().use { response ->
+            executePostRequest(json).use { response ->
+                val responseText = response.body?.string() ?: ""
                 val isSuccess = response.isSuccessful
+                android.util.Log.d("CloudSync", "Resposta DELETE da nuvem (HTTP ${response.code}): $responseText")
                 if (!isSuccess) {
                     android.util.Log.e("CloudSync", "Erro ao eliminar na nuvem: ${response.code}")
                 }

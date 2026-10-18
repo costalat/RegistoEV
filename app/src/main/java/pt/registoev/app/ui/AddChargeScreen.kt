@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
@@ -476,9 +477,13 @@ fun AddChargeScreen(
                                         Text("Código do Posto", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
                                         Box(modifier = Modifier.width(140.dp), contentAlignment = Alignment.CenterEnd) {
                                             BasicTextField(
-                                                value = codPosto, onValueChange = { codPosto = it.uppercase() }, modifier = Modifier.fillMaxWidth().focusRequester(codPostoFocusRequester),
+                                                value = codPosto,
+                                                onValueChange = { codPosto = formatStationCode(it, codPosto) },
+                                                modifier = Modifier.fillMaxWidth().focusRequester(codPostoFocusRequester),
                                                 textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color.White),
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text), cursorBrush = SolidColor(Color.White), singleLine = true,
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, capitalization = KeyboardCapitalization.Characters),
+                                                cursorBrush = SolidColor(Color.White),
+                                                singleLine = true,
                                                 decorationBox = { innerTextField ->
                                                     if (codPosto.isEmpty()) Text("ABC-00000", color = Color.DarkGray, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
                                                     innerTextField()
@@ -529,6 +534,30 @@ fun AddChargeScreen(
 @Composable
 fun IOSRowCard(content: @Composable () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color(0xFF1C1C1E)) { content() }
+}
+
+fun formatStationCode(input: String, previous: String = ""): String {
+    if (previous.endsWith("-") && input == previous.dropLast(1)) {
+        return previous.take(2)
+    }
+
+    val cleaned = input.uppercase().filter { it.isLetterOrDigit() }
+    var letters = ""
+    var digits = ""
+
+    for (char in cleaned) {
+        if (char.isLetter() && letters.length < 3) {
+            letters += char
+        } else if (char.isDigit() && letters.length == 3 && digits.length < 5) {
+            digits += char
+        }
+    }
+
+    return when {
+        letters.length < 3 -> letters
+        digits.isEmpty() -> "$letters-"
+        else -> "$letters-$digits"
+    }
 }
 
 @Composable

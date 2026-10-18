@@ -19,8 +19,8 @@ object CloudSyncManager {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
+        .followRedirects(followRedirects = true)
+        .followSslRedirects(followProtocolRedirects = true)
         .build()
 
     private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
@@ -113,8 +113,8 @@ object CloudSyncManager {
      */
     private fun executePostRequest(jsonPayload: String): okhttp3.Response {
         val noRedirectClient = client.newBuilder()
-            .followRedirects(false)
-            .followSslRedirects(false)
+            .followRedirects(followRedirects = false)
+            .followSslRedirects(followProtocolRedirects = false)
             .build()
 
         val bytes = jsonPayload.toByteArray(Charsets.UTF_8)
@@ -127,7 +127,7 @@ object CloudSyncManager {
 
         val response = noRedirectClient.newCall(initialRequest).execute()
 
-        if (response.code in 300..399) {
+        if ((response.code in 300..399)) {
             val redirectUrl = response.header("Location")
             response.close()
 
@@ -149,13 +149,6 @@ object CloudSyncManager {
      */
     suspend fun deleteRecord(charge: EvChargeEntity): Boolean {
         return deleteRecordBySyncId(getSyncId(charge))
-    }
-
-    /**
-     * Envia um comando para eliminar um registo no Google Sheets por ID numérico simples.
-     */
-    suspend fun deleteRecord(id: Long): Boolean = withContext(Dispatchers.IO) {
-        return@withContext deleteRecordBySyncId(id.toString())
     }
 
     /**

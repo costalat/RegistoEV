@@ -179,4 +179,86 @@ object CloudSyncManager {
             false
         }
     }
+
+    /**
+     * Pesquisa e descarrega da nuvem (Google Sheets) APENAS o registo com o maior odómetro
+     * ou data mais recente para a matrícula configurada.
+     */
+    suspend fun fetchLatestRecord(plate: String): EvChargeEntity? = withContext(Dispatchers.IO) {
+        if (plate.isBlank()) return@withContext null
+
+        val encodedPlate = try {
+            java.net.URLEncoder.encode(plate.trim(), "UTF-8")
+        } catch (_: Exception) {
+            plate.trim()
+        }
+
+        val url = "$GOOGLE_SCRIPT_URL?action=FETCH&plate=$encodedPlate"
+        android.util.Log.d("CloudSync", "A pesquisar último registo de controlo para matrícula $plate: $url")
+
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+
+        return@withContext try {
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val responseText = response.body?.string() ?: ""
+                    if (responseText.isNotBlank() && responseText.trim().startsWith("[")) {
+                        val jsonArray = com.google.gson.JsonParser.parseString(responseText).asJsonArray
+                        var latestRecord: EvChargeEntity? = null
+                        var maxOdometer = -1
+                        var maxDate = -1L
+
+                        for (element in jsonArray) {
+                            try {
+                                val obj = element.asJsonObject
+                                val origin = obj.get("origin")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                                val destination = obj.get("destination")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                                val odometer = obj.get("odometer")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                                val chargeType = obj.get("chargeType")?.takeIf { !it.isJsonNull }?.asString ?: "Nenhum"
+                                val kwh = obj.get("kwh")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
+                                val date = obj.get("date")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
+                                val codPosto = obj.get("codPosto")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                                val localidade = obj.get("localidade")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                                val liters = obj.get("liters")?.takeIf { !it.isJsonNull }?.asDouble
+                                val vPlate = obj.get("vehiclePlate")?.takeIf { !it.isJsonNull }?.asString ?: plate
+
+                                if (odometer > 0 && date > 0) {
+                                    if (odometer > maxOdometer || (odometer == maxOdometer && date > maxDate)) {
+                                        maxOdometer = odometer
+                                        maxDate = date
+                                        latestRecord = EvChargeEntity(
+                                            id = 0,
+                                            origin = origin,
+                                            destination = destination,
+                                            odometer = odometer,
+                                            chargeType = chargeType,
+                                            kwh = kwh,
+                                            date = date,
+                                            codPosto = codPosto,
+                                            localidade = localidade,
+                                            liters = liters,
+                                            vehiclePlate = vPlate
+                                        )
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("CloudSync", "Erro ao converter registo: ${e.message}")
+                            }
+                        }
+                        latestRecord
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CloudSync", "Falha de rede ao descarregar último registo: ${e.message}")
+            null
+        }
+    }
 }

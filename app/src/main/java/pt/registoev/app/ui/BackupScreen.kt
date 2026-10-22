@@ -881,6 +881,7 @@ fun parseJsonBackup(json: String): List<EvChargeEntity> {
         } else {
             System.currentTimeMillis()
         }
+        val plateValue = if (obj.has("vehiclePlate")) obj.getString("vehiclePlate") else obj.optString("matricula", "")
         result.add(EvChargeEntity(
             id = if (obj.has("id")) obj.getLong("id") else 0,
             origin = if (obj.has("origem")) obj.getString("origem") else obj.optString("origin", ""),
@@ -890,7 +891,8 @@ fun parseJsonBackup(json: String): List<EvChargeEntity> {
             kwh = if (obj.has("kw")) obj.getDouble("kw") else obj.optDouble("kwh", 0.0),
             date = dateValue,
             codPosto = if (obj.has("codPosto")) obj.getString("codPosto") else obj.optString("stationCode", ""),
-            localidade = if (obj.has("localidade")) obj.getString("localidade") else obj.optString("location", "")
+            localidade = if (obj.has("localidade")) obj.getString("localidade") else obj.optString("location", ""),
+            vehiclePlate = plateValue
         ))
     }
     return result
@@ -910,6 +912,7 @@ fun exportRecordsToJson(charges: List<EvChargeEntity>): String {
         obj.put("tipoCarga", charge.chargeType)
         obj.put("codPosto", charge.codPosto)
         obj.put("localidade", charge.localidade)
+        obj.put("vehiclePlate", charge.vehiclePlate)
         array.put(obj)
     }
     return array.toString(2)

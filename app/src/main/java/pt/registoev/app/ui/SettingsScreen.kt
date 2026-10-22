@@ -1,24 +1,105 @@
 package pt.registoev.app.ui
 
 import android.content.Context
+import android.content.SharedPreferences
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
+data class VehicleProfile(
+    val plate: String,
+    val brand: String = "",
+    val model: String = ""
+)
+
+object VehicleManager {
+    private val gson = Gson()
+
+    fun getVehicles(prefs: SharedPreferences): List<VehicleProfile> {
+        val json = prefs.getString("vehicles_json", null)
+        if (!json.isNullOrBlank()) {
+            return try {
+                val type = object : TypeToken<List<VehicleProfile>>() {}.type
+                val list: List<VehicleProfile> = gson.fromJson(json, type)
+                val sanitized = list.map { v ->
+                    if (v.plate.trim().uppercase() == "00-AA-00") v.copy(plate = "") else v
+                }
+                if (sanitized.isNotEmpty()) sanitized else getDefaultFromPrefs(prefs)
+            } catch (_: Exception) {
+                getDefaultFromPrefs(prefs)
+            }
+        }
+        val defaultList = getDefaultFromPrefs(prefs)
+        saveVehicles(prefs, defaultList)
+        return defaultList
+    }
+
+    private fun getDefaultFromPrefs(prefs: SharedPreferences): List<VehicleProfile> {
+        val rawPlate = prefs.getString("vehicle_plate", "")?.uppercase() ?: ""
+        val plate = if (rawPlate == "00-AA-00") "" else rawPlate
+        val brand = prefs.getString("vehicle_brand", "") ?: ""
+        val model = prefs.getString("vehicle_model", "") ?: ""
+        return listOf(VehicleProfile(plate = plate, brand = brand, model = model))
+    }
+
+    fun saveVehicles(prefs: SharedPreferences, list: List<VehicleProfile>) {
+        val json = gson.toJson(list)
+        prefs.edit { putString("vehicles_json", json) }
+    }
+
+    fun getActivePlate(prefs: SharedPreferences): String {
+        val active = prefs.getString("vehicle_plate", "")?.uppercase() ?: ""
+        if (active == "00-AA-00") {
+            prefs.edit { putString("vehicle_plate", "") }
+            return ""
+        }
+        if (active.isNotBlank()) return active
+        val vehicles = getVehicles(prefs)
+        val firstPlate = vehicles.firstOrNull()?.plate ?: ""
+        setActiveVehicle(prefs, firstPlate)
+        return firstPlate
+    }
+
+    fun setActiveVehicle(prefs: SharedPreferences, plate: String) {
+        val formatted = if (plate.trim().uppercase() == "00-AA-00") "" else plate.trim().uppercase()
+        val vehicles = getVehicles(prefs)
+        val matched = vehicles.firstOrNull { it.plate.equals(formatted, ignoreCase = true) }
+        
+        prefs.edit {
+            putString("vehicle_plate", formatted)
+            if (matched != null) {
+                putString("vehicle_brand", matched.brand)
+                putString("vehicle_model", matched.model)
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,20 +107,81 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE) }
 
-    var matricula by remember { 
-        mutableStateOf(sharedPrefs.getString("vehicle_plate", "") ?: "") 
-    }
-    var marca by remember { 
-        mutableStateOf(sharedPrefs.getString("vehicle_brand", "") ?: "") 
-    }
-    var modelo by remember { 
-        mutableStateOf(sharedPrefs.getString("vehicle_model", "") ?: "")
+    var vehicles by remember { mutableStateOf(VehicleManager.getVehicles(sharedPrefs)) }
+    var activePlate by remember { mutableStateOf(VehicleManager.getActivePlate(sharedPrefs)) }
+
+    var unidade by remember { 
+        mutableStateOf(sharedPrefs.getString("user_unit", "") ?: "")
     }
     var condutor by remember { 
         mutableStateOf(sharedPrefs.getString("driver_name", "") ?: "") 
     }
-    var unidade by remember { 
-        mutableStateOf(sharedPrefs.getString("user_unit", "") ?: "")
+
+    // Estado do formulário de veículo (Adicionar / Editar)
+    var showVehicleDialog by remember { mutableStateOf(false) }
+    var editingVehicle by remember { mutableStateOf<VehicleProfile?>(null) }
+    var inputPlate by remember { mutableStateOf("") }
+    var inputBrand by remember { mutableStateOf("") }
+    var inputModel by remember { mutableStateOf("") }
+
+    fun openAddDialog() {
+        editingVehicle = null
+        inputPlate = ""
+        inputBrand = ""
+        inputModel = ""
+        showVehicleDialog = true
+    }
+
+    fun openEditDialog(v: VehicleProfile) {
+        editingVehicle = v
+        val plateClean = if (v.plate == "00-AA-00") "" else v.plate
+        inputPlate = if (plateClean.filter { it.isLetterOrDigit() }.length >= 6) plateClean else ""
+        inputBrand = v.brand
+        inputModel = v.model
+        showVehicleDialog = true
+    }
+
+    fun saveVehicleForm() {
+        val rawClean = inputPlate.trim().uppercase()
+        val cleanPlate = if (rawClean == "00-AA-00") "" else rawClean
+
+        val newProfile = VehicleProfile(
+            plate = cleanPlate,
+            brand = inputBrand.trim(),
+            model = inputModel.trim()
+        )
+
+        val updatedList = vehicles.toMutableList()
+        if (editingVehicle != null) {
+            val idx = updatedList.indexOfFirst { it.plate.equals(editingVehicle!!.plate, ignoreCase = true) }
+            if (idx >= 0) updatedList[idx] = newProfile else updatedList.add(newProfile)
+        } else {
+            updatedList.removeAll { it.plate.equals(cleanPlate, ignoreCase = true) }
+            updatedList.add(newProfile)
+        }
+
+        vehicles = updatedList
+        VehicleManager.saveVehicles(sharedPrefs, updatedList)
+        
+        // Se for o único ou se estivermos a editar o ativo
+        if (vehicles.size == 1 || (editingVehicle != null && editingVehicle!!.plate == activePlate)) {
+            activePlate = cleanPlate
+            VehicleManager.setActiveVehicle(sharedPrefs, cleanPlate)
+        }
+        showVehicleDialog = false
+    }
+
+    fun deleteVehicle(v: VehicleProfile) {
+        if (vehicles.size <= 1) return // Manter pelo menos um veículo
+        val updatedList = vehicles.filterNot { it.plate.equals(v.plate, ignoreCase = true) }
+        vehicles = updatedList
+        VehicleManager.saveVehicles(sharedPrefs, updatedList)
+
+        if (activePlate.equals(v.plate, ignoreCase = true)) {
+            val newActive = updatedList.first().plate
+            activePlate = newActive
+            VehicleManager.setActiveVehicle(sharedPrefs, newActive)
+        }
     }
 
     Column(
@@ -48,28 +190,28 @@ fun SettingsScreen() {
             .background(Color.Black)
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Definições",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 4.dp),
         )
 
         // Card Unidade
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-            shape = RoundedCornerShape(24.dp),
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Business, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("UNIDADE", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Icon(Icons.Default.Business, null, tint = Color(0xFFFF9800), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("UNIDADE / ESTABELECIMENTO", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                 }
 
                 OutlinedTextField(
@@ -82,23 +224,23 @@ fun SettingsScreen() {
                     placeholder = { Text("Ex: Comando Territorial") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = settingsTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     singleLine = true
                 )
             }
         }
 
-        // Card Identificação do Condutor
+        // Card Identificação do Condutor (Global / Independente)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-            shape = RoundedCornerShape(24.dp),
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Icon(Icons.Default.Person, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("CONDUTOR", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                 }
 
@@ -109,75 +251,203 @@ fun SettingsScreen() {
                         sharedPrefs.edit { putString("driver_name", it) }
                     },
                     label = { Text("Nome do Condutor") },
+                    placeholder = { Text("Ex: João Silva") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = settingsTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     singleLine = true
                 )
             }
         }
 
-        // Card Identificação do Veículo
+        // Card Gestão de Frota / Veículos
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-            shape = RoundedCornerShape(24.dp),
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("VEÍCULO", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF2196F3), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("GESTÃO DE VEÍCULOS / FROTA", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { openAddDialog() }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "Adicionar Veículo", tint = Color(0xFF4CAF50))
+                    }
                 }
 
-                OutlinedTextField(
-                    value = marca,
-                    onValueChange = { 
-                        marca = it
-                        sharedPrefs.edit { putString("vehicle_brand", it) }
-                    },
-                    label = { Text("Marca") },
-                    placeholder = { Text("Ex: Tesla") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = settingsTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                Text(
+                    text = "Selecione o veículo ativo para registo e consulta de dados nas abas da aplicação:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.LightGray
                 )
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = modelo,
-                        onValueChange = { 
-                            modelo = it
-                            sharedPrefs.edit { putString("vehicle_model", it) }
-                        },
-                        label = { Text("Modelo") },
-                        placeholder = { Text("Ex: Model 3") },
-                        modifier = Modifier.weight(1f),
-                        colors = settingsTextFieldColors(),
+                vehicles.forEach { v ->
+                    val isActive = v.plate.equals(activePlate, ignoreCase = true)
+                    val plateClean = if (v.plate == "00-AA-00") "" else v.plate
+                    val displayPlate = if (plateClean.filter { it.isLetterOrDigit() }.length >= 6) plateClean else "??-??-??"
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                activePlate = v.plate
+                                VehicleManager.setActiveVehicle(sharedPrefs, v.plate)
+                            },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isActive) Color(0xFF2C2C2E) else Color(0xFF141416)
+                        ),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
+                        border = BorderStroke(
+                            width = if (isActive) 1.5.dp else 0.5.dp,
+                            color = if (isActive) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Badge estilizado de Matrícula
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White)
+                                    .border(1.dp, Color.Black, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = displayPlate,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    fontSize = 14.sp
+                                )
+                            }
 
-                    OutlinedTextField(
-                        value = matricula,
-                        onValueChange = { 
-                            matricula = it
-                            sharedPrefs.edit { putString("vehicle_plate", it) }
-                        },
-                        label = { Text("Matrícula") },
-                        placeholder = { Text("00-AA-00") },
-                        modifier = Modifier.weight(1f),
-                        colors = settingsTextFieldColors(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                val titleText = listOf(v.brand, v.model).filter { it.isNotBlank() }.joinToString(" ")
+                                Text(
+                                    text = if (titleText.isNotBlank()) titleText else "Veículo sem nome",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            if (isActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF4CAF50).copy(alpha = 0.2f))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("ATIVO", fontSize = 11.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(onClick = { openEditDialog(v) }) {
+                                Icon(Icons.Default.Edit, "Editar", tint = Color.LightGray, modifier = Modifier.size(20.dp))
+                            }
+
+                            if (vehicles.size > 1) {
+                                IconButton(onClick = { deleteVehicle(v) }) {
+                                    Icon(Icons.Default.Delete, "Eliminar", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = { openAddDialog() },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ADICIONAR NOVO VEÍCULO", fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(110.dp))
+    }
+
+    // Modal para Adicionar / Editar Veículo
+    if (showVehicleDialog) {
+        AlertDialog(
+            onDismissRequest = { showVehicleDialog = false },
+            title = {
+                Text(
+                    text = if (editingVehicle != null) "Editar Veículo" else "Adicionar Veículo",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = inputPlate,
+                        onValueChange = { 
+                            val updated = it.uppercase()
+                            inputPlate = updated
+                            // Atualizar em tempo real se este for o veículo ativo
+                            if (editingVehicle != null && editingVehicle!!.plate == activePlate) {
+                                activePlate = updated
+                                VehicleManager.setActiveVehicle(sharedPrefs, updated)
+                            }
+                        },
+                        label = { Text("Matrícula") },
+                        placeholder = { Text("Ex: 00-AA-00") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = settingsTextFieldColors(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = inputBrand,
+                        onValueChange = { inputBrand = it },
+                        label = { Text("Marca") },
+                        placeholder = { Text("Ex: Tesla / Nissan") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = settingsTextFieldColors(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = inputModel,
+                        onValueChange = { inputModel = it },
+                        label = { Text("Modelo") },
+                        placeholder = { Text("Ex: Model 3 / Leaf") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = settingsTextFieldColors(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { saveVehicleForm() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Text("GUARDAR", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVehicleDialog = false }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF1C1C1E)
+        )
     }
 }
 

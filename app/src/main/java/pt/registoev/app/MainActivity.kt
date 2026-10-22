@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -72,6 +73,13 @@ class MainActivity : ComponentActivity() {
 
         var isUpdatingData by mutableStateOf(value = false)
 
+        // Migração automática de registos antigos para a matrícula ativa
+        lifecycleScope.launch(Dispatchers.IO) {
+            val prefs = getSharedPreferences("registoev_prefs", MODE_PRIVATE)
+            val primaryPlate = VehicleManager.getActivePlate(prefs)
+            dao.migrateEmptyPlatesTo(primaryPlate)
+        }
+
         // Lógica de Sincronização Inicial V1.7.1 (Mapa em Memória)
         lifecycleScope.launch(Dispatchers.IO) {
             val prefs = getSharedPreferences("registoev_prefs", MODE_PRIVATE)
@@ -128,27 +136,70 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     var editingRecord by remember { mutableStateOf<EvChargeEntity?>(null) }
-                    val charges by dao.all().collectAsState(initial = emptyList())
+                    val prefs = remember { getSharedPreferences("registoev_prefs", MODE_PRIVATE) }
+                    var activePlate by remember { mutableStateOf(VehicleManager.getActivePlate(prefs)) }
+
                     val scope = rememberCoroutineScope()
                     val pagerState = rememberPagerState(initialPage = AppTab.NEW.ordinal) { AppTab.entries.size }
                     val navScrollState = rememberScrollState()
 
-                    LaunchedEffect(pagerState.targetPage) {
-                        if (AppTab.entries[pagerState.targetPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
+                    // Re-ler matrícula ativa sempre que mudar de página ou através do SharedPreferences listener
+                    DisposableEffect(prefs) {
+                        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                            if (key == "vehicle_plate") {
+                                activePlate = VehicleManager.getActivePlate(prefs)
+                            }
+                        }
+                        prefs.registerOnSharedPreferenceChangeListener(listener)
+                        onDispose {
+                            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+                        }
+                    }
+
+                    LaunchedEffect(pagerState.currentPage) {
+                        activePlate = VehicleManager.getActivePlate(prefs)
+                        if (AppTab.entries[pagerState.currentPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
                             editingRecord = null
                         }
                         // Auto-scroll da barra de navegação para manter o item visível
                         if (navScrollState.maxValue > 0) {
-                            val targetScroll = (navScrollState.maxValue.toFloat() * (pagerState.targetPage.toFloat() / (AppTab.entries.size - 1))).toInt()
+                            val targetScroll = (navScrollState.maxValue.toFloat() * (pagerState.currentPage.toFloat() / (AppTab.entries.size - 1))).toInt()
                             navScrollState.animateScrollTo(targetScroll)
                         }
                     }
+
+                    val cleanActive = if (activePlate.trim().uppercase() == "00-AA-00") "" else activePlate.trim()
+                    val charges by dao.allForPlate(cleanActive).collectAsState(initial = emptyList())
+                    val hasValidPlate = cleanActive.filter { it.isLetterOrDigit() }.length >= 6
 
                     Scaffold(
                         containerColor = Color(0xFF000000),
                         topBar = {
                             TopAppBar(
                                 title = { Text(AppTab.entries[pagerState.targetPage].title) },
+                                actions = {
+                                    // Distintivo de Matrícula no Canto Superior Direito (Apresentar APENAS se existir matrícula válida)
+                                    if (hasValidPlate) {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(end = 12.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color.White)
+                                                .border(1.dp, Color.Black, RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    scope.launch { pagerState.animateScrollToPage(AppTab.SETTINGS.ordinal) }
+                                                }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = cleanActive,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.Black,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                },
                                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White),
                             )
                         }
@@ -177,7 +228,8 @@ class MainActivity : ComponentActivity() {
                                                         val entity = EvChargeEntity(
                                                             id = id ?: 0, origin = origin, destination = destination,
                                                             odometer = odometer, chargeType = chargeType, kwh = kwh, date = date,
-                                                            codPosto = codPosto, localidade = locality, liters = liters
+                                                            codPosto = codPosto, localidade = locality, liters = liters,
+                                                            vehiclePlate = activePlate
                                                         )
                                                         val savedId = dao.insert(entity)
                                                         

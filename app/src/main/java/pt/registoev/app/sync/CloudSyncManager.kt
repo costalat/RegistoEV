@@ -14,7 +14,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object CloudSyncManager {
-    private const val GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-EQjd6GX5uKI0Ig_tUlr2NtgzKJhUx95XPK8_DP6XEY73iriBZWD74gZ02kNGDH4xTA/exec"
+    private val GOOGLE_SCRIPT_URL = AppConfig.GOOGLE_SCRIPT_URL
     
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)

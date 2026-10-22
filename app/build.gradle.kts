@@ -1,4 +1,3 @@
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,6 +19,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    flavorDimensions += "version"
+    productFlavors {
+        create("base") {
+            dimension = "version"
+            applicationId = "pt.registoev.app"
+            versionNameSuffix = "-base"
+        }
+        create("condutor") {
+            dimension = "version"
+            applicationId = "pt.registoev.app.condutor"
+            versionNameSuffix = "-condutor"
         }
     }
 

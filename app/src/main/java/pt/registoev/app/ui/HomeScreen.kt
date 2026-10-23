@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import pt.registoev.app.BuildConfig
 import pt.registoev.app.data.EvChargeEntity
 import java.text.SimpleDateFormat
 import java.util.*
@@ -42,8 +43,10 @@ fun KmHistoryScreen(charges: List<EvChargeEntity>) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
     ) {
-        item {
-            DashboardSection(charges = charges)
+        if (BuildConfig.FLAVOR != "condutor") {
+            item {
+                DashboardSection(charges = charges)
+            }
         }
         
         item {
@@ -186,8 +189,10 @@ fun ChargeHistoryScreen(charges: List<EvChargeEntity>) {
     LazyColumn(
         modifier = Modifier.fillMaxSize()
     ) {
-        item {
-            NetworkEnergySection(charges = charges)
+        if (BuildConfig.FLAVOR != "condutor") {
+            item {
+                NetworkEnergySection(charges = charges)
+            }
         }
 
         item {

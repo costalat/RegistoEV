@@ -58,6 +58,14 @@ enum class AppTab(val title: String, val icon: ImageVector) {
     ABOUT("Sobre", Icons.Default.Info)
 }
 
+fun getAvailableTabs(flavor: String = BuildConfig.FLAVOR): List<AppTab> {
+    return if (flavor == "condutor") {
+        AppTab.entries.filter { it != AppTab.BACKUP }
+    } else {
+        AppTab.entries
+    }
+}
+
 class MainActivity : ComponentActivity() {
     
     private var stationMap: Map<String, Pair<Double, Double>>? = null
@@ -164,20 +172,24 @@ class MainActivity : ComponentActivity() {
                     val hasValidPlate = cleanActive.filter { it.isLetterOrDigit() }.length >= 6
                     val isSetupComplete = userUnit.isNotBlank() && driverName.isNotBlank() && hasValidPlate
 
-                    val initialTab = if (isSetupComplete) AppTab.NEW.ordinal else AppTab.SETTINGS.ordinal
-                    val pagerState = rememberPagerState(initialPage = initialTab) { AppTab.entries.size }
+                    val availableTabs = remember { getAvailableTabs(BuildConfig.FLAVOR) }
+                    fun tabIndex(tab: AppTab): Int = availableTabs.indexOf(tab).coerceAtLeast(0)
+
+                    val initialTab = if (isSetupComplete) tabIndex(AppTab.NEW) else tabIndex(AppTab.SETTINGS)
+                    val pagerState = rememberPagerState(initialPage = initialTab) { availableTabs.size }
                     val navScrollState = rememberScrollState()
 
                     LaunchedEffect(pagerState.currentPage) {
                         activePlate = VehicleManager.getActivePlate(prefs)
                         userUnit = prefs.getString("user_unit", "") ?: ""
                         driverName = prefs.getString("driver_name", "") ?: ""
-                        if (AppTab.entries[pagerState.currentPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
+                        if ((availableTabs.getOrNull(pagerState.currentPage) != AppTab.NEW) && !pagerState.isScrollInProgress) {
                             editingRecord = null
                         }
                         // Auto-scroll da barra de navegação para manter o item visível
                         if (navScrollState.maxValue > 0) {
-                            val targetScroll = (navScrollState.maxValue.toFloat() * (pagerState.currentPage.toFloat() / (AppTab.entries.size - 1))).toInt()
+                            val maxIndex = (availableTabs.size - 1).coerceAtLeast(1)
+                            val targetScroll = (navScrollState.maxValue.toFloat() * (pagerState.currentPage.toFloat() / maxIndex)).toInt()
                             navScrollState.animateScrollTo(targetScroll)
                         }
                     }
@@ -188,7 +200,7 @@ class MainActivity : ComponentActivity() {
                         containerColor = Color(0xFF000000),
                         topBar = {
                             TopAppBar(
-                                title = { Text(AppTab.entries[pagerState.targetPage].title) },
+                                title = { Text(availableTabs.getOrNull(pagerState.targetPage)?.title ?: "") },
                                 actions = {
                                     // Distintivo de Matrícula no Canto Superior Direito (Apresentar APENAS se existir matrícula válida)
                                     if (hasValidPlate) {
@@ -199,9 +211,9 @@ class MainActivity : ComponentActivity() {
                                                 .background(Color.White)
                                                 .border(1.dp, Color.Black, RoundedCornerShape(6.dp))
                                                 .clickable {
-                                                    scope.launch { pagerState.animateScrollToPage(AppTab.SETTINGS.ordinal) }
+                                                    scope.launch { pagerState.animateScrollToPage(tabIndex(AppTab.SETTINGS)) }
                                                 }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
                                         ) {
                                             Text(
                                                 text = cleanActive,
@@ -221,7 +233,7 @@ class MainActivity : ComponentActivity() {
                                 HorizontalPager(
                                     state = pagerState, modifier = Modifier.fillMaxSize(), userScrollEnabled = true, verticalAlignment = Alignment.Top
                                 ) { page ->
-                                    when (AppTab.entries[page]) {
+                                    when (availableTabs.getOrNull(page)) {
                                         AppTab.NEW -> {
                                             val missingFields = mutableListOf<String>().apply {
                                                 if (userUnit.isBlank()) add("Unidade / Estabelecimento")
@@ -235,7 +247,7 @@ class MainActivity : ComponentActivity() {
                                                 isSetupComplete = isSetupComplete,
                                                 missingFields = missingFields,
                                                 onNavigateToSettings = {
-                                                    scope.launch { pagerState.animateScrollToPage(AppTab.SETTINGS.ordinal) }
+                                                    scope.launch { pagerState.animateScrollToPage(tabIndex(AppTab.SETTINGS)) }
                                                 },
                                                 onSave = { origin, destination, odometer, chargeType, kwh, date, id, codPosto, liters, manualLocality ->
                                                     scope.launch {
@@ -279,12 +291,12 @@ class MainActivity : ComponentActivity() {
                                                         }
 
                                                         editingRecord = null
-                                                        pagerState.animateScrollToPage(if (id != null) AppTab.EDIT.ordinal else AppTab.KM.ordinal)
+                                                        pagerState.animateScrollToPage(if (id != null) tabIndex(AppTab.EDIT) else tabIndex(AppTab.KM))
                                                     }
                                                 },
                                                 onCancelEdit = {
                                                     editingRecord = null
-                                                    scope.launch { pagerState.animateScrollToPage(AppTab.EDIT.ordinal) }
+                                                    scope.launch { pagerState.animateScrollToPage(tabIndex(AppTab.EDIT)) }
                                                 },
                                             )
                                         }
@@ -296,7 +308,7 @@ class MainActivity : ComponentActivity() {
                                                 charges = charges,
                                                 onEditClick = { record ->
                                                     editingRecord = record
-                                                    scope.launch { pagerState.animateScrollToPage(AppTab.NEW.ordinal) }
+                                                    scope.launch { pagerState.animateScrollToPage(tabIndex(AppTab.NEW)) }
                                                 },
                                                 onDeleteSelected = { ids ->
                                                     val itemsToDelete = charges.filter { it.id in ids }
@@ -348,6 +360,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                         AppTab.SETTINGS -> SettingsScreen()
                                         AppTab.ABOUT -> AboutScreen()
+                                        null -> {}
                                     }
                                 }
                             }
@@ -371,8 +384,8 @@ class MainActivity : ComponentActivity() {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    AppTab.entries.forEach { tab ->
-                                        val isSelected = pagerState.targetPage == tab.ordinal
+                                    availableTabs.forEachIndexed { pageIndex, tab ->
+                                        val isSelected = pagerState.targetPage == pageIndex
                                         val tint by animateColorAsState(if (isSelected) Color.White else Color.Gray, label = "")
                                         val background by animateColorAsState(if (isSelected) Color(0xFF2196F3) else Color.Transparent, label = "")
 
@@ -380,7 +393,7 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier
                                                 .clip(CircleShape).background(background)
                                                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                                                    scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
+                                                    scope.launch { pagerState.animateScrollToPage(pageIndex) }
                                                 }
                                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                                             contentAlignment = Alignment.Center,

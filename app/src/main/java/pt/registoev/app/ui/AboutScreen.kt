@@ -39,7 +39,7 @@ fun AboutScreen() {
         
         Image(
             painter = painterResource(id = R.drawable.about_logo),
-            contentDescription = "Registo EV Logo",
+            contentDescription = "Registo Auto Logo",
             modifier = Modifier
                 .size(160.dp) // Tamanho ajustado para visibilidade
                 .clip(RoundedCornerShape(28.dp)),
@@ -48,7 +48,7 @@ fun AboutScreen() {
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Registo EV",
+            text = "Registo Auto",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
             fontWeight = FontWeight.Bold,
@@ -57,7 +57,7 @@ fun AboutScreen() {
         Text(
             text = "Versão 1.8.2",
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray
+            color = Color.Gray,
         )
         
         Spacer(modifier = Modifier.height(40.dp))
@@ -67,7 +67,7 @@ fun AboutScreen() {
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
             shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -75,22 +75,22 @@ fun AboutScreen() {
                         Icons.Default.AutoAwesome, 
                         null, 
                         tint = Color(0xFFFFD700), 
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "Sobre a aplicação",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "O Registo EV simplifica a gestão da mobilidade elétrica, permitindo o rigoroso controlo de consumos e quilometragem.",
+                    text = "O Registo Auto simplifica a gestão da mobilidade e do veículo, permitindo o controlo de consumos, carregamentos/abastecimentos e quilometragem.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray,
-                    lineHeight = 22.sp
+                    lineHeight = 22.sp,
                 )
             }
         }

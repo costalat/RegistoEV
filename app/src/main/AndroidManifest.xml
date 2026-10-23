@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-     android:label="Registo EV"
+     android:label="Registo Auto"
      android:theme="@style/Theme.RegistoEV.Splash"
      android:icon="@mipmap/ic_launcher">
   <activity android:name=".SplashActivity"

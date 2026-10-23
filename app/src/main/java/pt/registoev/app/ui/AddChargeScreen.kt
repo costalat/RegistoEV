@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +42,9 @@ import java.util.*
 fun AddChargeScreen(
     existingCharges: List<EvChargeEntity>,
     editingRecord: EvChargeEntity? = null,
+    isSetupComplete: Boolean = true,
+    missingFields: List<String> = emptyList(),
+    onNavigateToSettings: () -> Unit = {},
     onSave: (String, String, Int, String, Double, Long, Long?, String, Double?, String?) -> Unit,
     onCancelEdit: () -> Unit = {},
 ) {
@@ -302,14 +307,89 @@ fun AddChargeScreen(
         ) { DatePicker(state = datePickerState) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    if (!isSetupComplete) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(0.5.dp, Color(0xFFFF9800).copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = Color(0xFFFF9800),
+                        modifier = Modifier.size(48.dp)
+                    )
+
+                    Text(
+                        text = "Configuração Inicial Pendente",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = "Para registar novos movimentos, por favor preencha os seguintes dados nas Definições:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.LightGray,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF2C2C2E))
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        missingFields.forEach { field ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("•", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = field, color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("IR PARA AS DEFINIÇÕES", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         // --- DATA ---
         IOSRowCard {
             Row(
@@ -528,6 +608,7 @@ fun AddChargeScreen(
 
         if (editingRecord != null) TextButton(onClick = onCancelEdit, modifier = Modifier.fillMaxWidth()) { Text("Cancelar", color = Color.LightGray) }
         Spacer(modifier = Modifier.height(110.dp))
+    }
     }
 }
 

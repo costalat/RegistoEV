@@ -31,7 +31,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -65,7 +64,6 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
         super.onCreate(savedInstanceState)
         
         val db = AppDatabase.get(this)
@@ -138,16 +136,22 @@ class MainActivity : ComponentActivity() {
                     var editingRecord by remember { mutableStateOf<EvChargeEntity?>(null) }
                     val prefs = remember { getSharedPreferences("registoev_prefs", MODE_PRIVATE) }
                     var activePlate by remember { mutableStateOf(VehicleManager.getActivePlate(prefs)) }
+                    var userUnit by remember { mutableStateOf(prefs.getString("user_unit", "") ?: "") }
+                    var driverName by remember { mutableStateOf(prefs.getString("driver_name", "") ?: "") }
 
                     val scope = rememberCoroutineScope()
-                    val pagerState = rememberPagerState(initialPage = AppTab.NEW.ordinal) { AppTab.entries.size }
-                    val navScrollState = rememberScrollState()
 
-                    // Re-ler matrícula ativa sempre que mudar de página ou através do SharedPreferences listener
+                    // Re-ler matrícula ativa, unidade e condutor sempre que mudar de página ou através do SharedPreferences listener
                     DisposableEffect(prefs) {
                         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                             if (key == "vehicle_plate") {
                                 activePlate = VehicleManager.getActivePlate(prefs)
+                            }
+                            if (key == "user_unit") {
+                                userUnit = prefs.getString("user_unit", "") ?: ""
+                            }
+                            if (key == "driver_name") {
+                                driverName = prefs.getString("driver_name", "") ?: ""
                             }
                         }
                         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -156,8 +160,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    val cleanActive = if (activePlate.trim().uppercase() == "00-AA-00") "" else activePlate.trim()
+                    val hasValidPlate = cleanActive.filter { it.isLetterOrDigit() }.length >= 6
+                    val isSetupComplete = userUnit.isNotBlank() && driverName.isNotBlank() && hasValidPlate
+
+                    val initialTab = if (isSetupComplete) AppTab.NEW.ordinal else AppTab.SETTINGS.ordinal
+                    val pagerState = rememberPagerState(initialPage = initialTab) { AppTab.entries.size }
+                    val navScrollState = rememberScrollState()
+
                     LaunchedEffect(pagerState.currentPage) {
                         activePlate = VehicleManager.getActivePlate(prefs)
+                        userUnit = prefs.getString("user_unit", "") ?: ""
+                        driverName = prefs.getString("driver_name", "") ?: ""
                         if (AppTab.entries[pagerState.currentPage] != AppTab.NEW && !pagerState.isScrollInProgress) {
                             editingRecord = null
                         }
@@ -168,9 +182,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    val cleanActive = if (activePlate.trim().uppercase() == "00-AA-00") "" else activePlate.trim()
                     val charges by dao.allForPlate(cleanActive).collectAsState(initial = emptyList())
-                    val hasValidPlate = cleanActive.filter { it.isLetterOrDigit() }.length >= 6
 
                     Scaffold(
                         containerColor = Color(0xFF000000),
@@ -211,9 +223,20 @@ class MainActivity : ComponentActivity() {
                                 ) { page ->
                                     when (AppTab.entries[page]) {
                                         AppTab.NEW -> {
+                                            val missingFields = mutableListOf<String>().apply {
+                                                if (userUnit.isBlank()) add("Unidade / Estabelecimento")
+                                                if (driverName.isBlank()) add("Nome do Condutor")
+                                                if (!hasValidPlate) add("Matrícula da Viatura")
+                                            }
+
                                             AddChargeScreen(
                                                 existingCharges = charges,
                                                 editingRecord = editingRecord,
+                                                isSetupComplete = isSetupComplete,
+                                                missingFields = missingFields,
+                                                onNavigateToSettings = {
+                                                    scope.launch { pagerState.animateScrollToPage(AppTab.SETTINGS.ordinal) }
+                                                },
                                                 onSave = { origin, destination, odometer, chargeType, kwh, date, id, codPosto, liters, manualLocality ->
                                                     scope.launch {
                                                         var locality = manualLocality ?: ""

@@ -221,7 +221,7 @@ fun SettingsScreen() {
                         sharedPrefs.edit { putString("user_unit", it) }
                     },
                     label = { Text("Unidade / Estabelecimento / Órgão") },
-                    placeholder = { Text("Ex: Comando Territorial") },
+                    placeholder = { Text("Ex: UAGME") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = settingsTextFieldColors(),
                     shape = RoundedCornerShape(10.dp),

@@ -305,62 +305,84 @@ fun SettingsScreen() {
                             color = if (isActive) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.1f)
                         )
                     ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(12.dp)
                         ) {
-                            // Badge estilizado de Matrícula
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.White)
-                                    .border(1.dp, Color.Black, RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            // LINHA SUPERIOR: Nome do Veículo + Badge ATIVO
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = displayPlate,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black,
-                                    fontSize = 14.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
                                 val titleText = listOf(v.brand, v.model).filter { it.isNotBlank() }.joinToString(" ")
                                 Text(
                                     text = if (titleText.isNotBlank()) titleText else "Veículo sem nome",
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.titleMedium,
                                     color = Color.White,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
                                 )
-                            }
 
-                            if (isActive) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF4CAF50).copy(alpha = 0.2f))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ATIVO", fontSize = 11.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                                if (isActive) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFF4CAF50).copy(alpha = 0.2f))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Check, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("ATIVO", fontSize = 11.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                            IconButton(onClick = { openEditDialog(v) }) {
-                                Icon(Icons.Default.Edit, "Editar", tint = Color.LightGray, modifier = Modifier.size(20.dp))
-                            }
+                            // LINHA INFERIOR: Matrícula + Botões de Ação
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Badge estilizado de Matrícula
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color.White)
+                                        .border(1.dp, Color.Black, RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = displayPlate,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        fontSize = 13.sp
+                                    )
+                                }
 
-                            if (vehicles.size > 1) {
-                                IconButton(onClick = { deleteVehicle(v) }) {
-                                    Icon(Icons.Default.Delete, "Eliminar", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { openEditDialog(v) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, "Editar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                                    }
+
+                                    if (vehicles.size > 1) {
+                                        IconButton(
+                                            onClick = { deleteVehicle(v) },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, "Eliminar", tint = Color(0xFFE53935), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
                                 }
                             }
                         }

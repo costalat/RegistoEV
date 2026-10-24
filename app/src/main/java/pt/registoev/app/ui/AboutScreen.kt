@@ -3,6 +3,7 @@ package pt.registoev.app.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -12,10 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,15 +40,8 @@ fun AboutScreen() {
     ) {
         Spacer(modifier = Modifier.height(1.dp))
         
-        // --- BRANDING HEADER (FOLLOWING REFERENCE IMAGE) ---
-        
-        Image(
-            painter = painterResource(id = R.drawable.about_logo),
-            contentDescription = "Registo Auto Logo",
-            modifier = Modifier
-                .size(160.dp) // Tamanho ajustado para visibilidade
-                .clip(RoundedCornerShape(28.dp)),
-        )
+        // --- BRANDING HEADER ---
+        RegistoAutoLogo()
         
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -273,5 +271,35 @@ fun CreditItemWithCustomIcon(role: String, name: String, iconRes: Int) {
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@Composable
+fun RegistoAutoLogo(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(8.dp)
+            .size(175.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        // IMAGEM DO NOVO LOGO OFICIAL (Registo Auto)
+        Image(
+            painter = painterResource(id = R.drawable.about_logo),
+            contentDescription = "Registo Auto Logo",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(32.dp))
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFF00E5FF).copy(alpha = 0.8f), // Ciano Elétrico
+                            Color(0xFFFF9100).copy(alpha = 0.8f), // Âmbar Combustível
+                        ),
+                    ),
+                    shape = RoundedCornerShape(32.dp),
+                ),
+        )
     }
 }

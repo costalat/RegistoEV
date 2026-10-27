@@ -13,8 +13,8 @@ android {
         applicationId = "pt.registoev.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.8.2"
+        versionCode = 11
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

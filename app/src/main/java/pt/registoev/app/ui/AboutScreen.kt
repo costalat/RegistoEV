@@ -53,7 +53,7 @@ fun AboutScreen() {
         )
         
         Text(
-            text = "Versão 1.8.2",
+            text = "Versão 2.0",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray,
         )
@@ -153,7 +153,7 @@ fun AboutScreen() {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "NOVIDADES V1.8.2",
+                    text = "NOVIDADES V2.0",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
                     letterSpacing = 1.sp,

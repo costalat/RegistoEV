@@ -25,7 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
@@ -101,6 +103,74 @@ object VehicleManager {
     }
 }
 
+fun formatVehiclePlateFromRaw(raw: String): String {
+    val limited = raw.take(6)
+    return when {
+        limited.length <= 2 -> limited
+        limited.length <= 4 -> "${limited.substring(0, 2)}-${limited.substring(2)}"
+        else -> "${limited.substring(0, 2)}-${limited.substring(2, 4)}-${limited.substring(4)}"
+    }
+}
+
+fun formatVehiclePlate(input: String, previous: String = ""): String {
+    // Se o utilizador apagou o hífen via backspace (ex: "AA-" -> "AA")
+    if (previous.endsWith("-") && !input.endsWith("-") && input.length == previous.length - 1) {
+        val cleanPrev = previous.filter { it.isLetterOrDigit() }
+        if (cleanPrev.length > 1) {
+            val trimmed = cleanPrev.dropLast(1).uppercase()
+            return formatVehiclePlateFromRaw(trimmed)
+        }
+    }
+    
+    val raw = input.filter { it.isLetterOrDigit() }.uppercase()
+    return formatVehiclePlateFromRaw(raw)
+}
+
+fun calculatePlateCursorPosition(
+    @Suppress("UNUSED_PARAMETER") oldText: String,
+    @Suppress("UNUSED_PARAMETER") oldCursor: Int,
+    formattedText: String,
+    rawNewText: String,
+    rawCursor: Int,
+): Int {
+    if (rawCursor >= rawNewText.length) {
+        return formattedText.length
+    }
+    
+    val newAlphanumericCount = rawNewText.take(rawCursor).count { it.isLetterOrDigit() }
+    
+    var count = 0
+    var formattedIndex = 0
+    while (formattedIndex < formattedText.length && count < newAlphanumericCount) {
+        if (formattedText[formattedIndex].isLetterOrDigit()) {
+            count++
+        }
+        formattedIndex++
+    }
+    
+    if (formattedIndex < formattedText.length && formattedText[formattedIndex] == '-') {
+        formattedIndex++
+    }
+    
+    return formattedIndex.coerceIn(0, formattedText.length)
+}
+
+fun formatVehiclePlateTextFieldValue(newValue: TextFieldValue, oldValue: TextFieldValue): TextFieldValue {
+    val oldText = oldValue.text
+    val newText = newValue.text
+    val formattedText = formatVehiclePlate(newText, oldText)
+    
+    if (formattedText == oldText && newText == oldText) {
+        return newValue
+    }
+    
+    val cursorIndex = calculatePlateCursorPosition(oldText, oldValue.selection.end, formattedText, newText, newValue.selection.end)
+    return TextFieldValue(
+        text = formattedText,
+        selection = TextRange(cursorIndex.coerceIn(0, formattedText.length)),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -122,13 +192,14 @@ fun SettingsScreen(
     // Estado do formulário de veículo (Adicionar / Editar)
     var showVehicleDialog by remember { mutableStateOf(false) }
     var editingVehicle by remember { mutableStateOf<VehicleProfile?>(null) }
-    var inputPlate by remember { mutableStateOf("") }
+    var inputPlateState by remember { mutableStateOf(TextFieldValue("")) }
+    val inputPlate = inputPlateState.text
     var inputBrand by remember { mutableStateOf("") }
     var inputModel by remember { mutableStateOf("") }
 
     fun openAddDialog() {
         editingVehicle = null
-        inputPlate = ""
+        inputPlateState = TextFieldValue("")
         inputBrand = ""
         inputModel = ""
         showVehicleDialog = true
@@ -137,7 +208,8 @@ fun SettingsScreen(
     fun openEditDialog(v: VehicleProfile) {
         editingVehicle = v
         val plateClean = if (v.plate == "00-AA-00") "" else v.plate
-        inputPlate = if (plateClean.filter { it.isLetterOrDigit() }.length >= 6) plateClean else ""
+        val formatted = formatVehiclePlate(plateClean)
+        inputPlateState = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
         inputBrand = v.brand
         inputModel = v.model
         showVehicleDialog = true
@@ -422,18 +494,19 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
-                        value = inputPlate,
-                        onValueChange = { 
-                            val updated = it.uppercase()
-                            inputPlate = updated
+                        value = inputPlateState,
+                        onValueChange = { newValue ->
+                            val updatedState = formatVehiclePlateTextFieldValue(newValue, inputPlateState)
+                            inputPlateState = updatedState
+                            val updatedText = updatedState.text
                             // Atualizar em tempo real se este for o veículo ativo
                             if (editingVehicle != null && editingVehicle!!.plate == activePlate) {
-                                activePlate = updated
-                                VehicleManager.setActiveVehicle(sharedPrefs, updated)
+                                activePlate = updatedText
+                                VehicleManager.setActiveVehicle(sharedPrefs, updatedText)
                             }
                         },
                         label = { Text("Matrícula") },
-                        placeholder = { Text("Ex: 00-AA-00") },
+                        placeholder = { Text("Ex: AA-23-CV") },
                         modifier = Modifier.fillMaxWidth(),
                         colors = settingsTextFieldColors(),
                         singleLine = true

@@ -261,4 +261,30 @@ object CloudSyncManager {
             null
         }
     }
+
+    /**
+     * Consulta a nuvem para a matrícula configurada e descarrega/guarda o registo se
+     * o odómetro da nuvem for superior ao registo local mais recente no smartphone.
+     */
+    suspend fun syncLatestRecordIfNeeded(dao: pt.registoev.app.data.EvDao, plate: String): Boolean = withContext(Dispatchers.IO) {
+        if (plate.isBlank()) return@withContext false
+        val cleanPlate = if (plate.trim().uppercase() == "00-AA-00") "" else plate.trim()
+        if (cleanPlate.isBlank()) return@withContext false
+
+        val cloudRecord = fetchLatestRecord(cleanPlate) ?: return@withContext false
+        val localList = dao.allListForPlate(cleanPlate)
+        val localMaxOdometer = localList.maxOfOrNull { it.odometer } ?: 0
+
+        if (cloudRecord.odometer > localMaxOdometer) {
+            val alreadyExists = localList.any { 
+                it.odometer == cloudRecord.odometer && it.date == cloudRecord.date 
+            }
+            if (!alreadyExists) {
+                android.util.Log.d("CloudSync", "Descarregado registo mais recente da nuvem para $cleanPlate: Odo ${cloudRecord.odometer} km (Local máx: $localMaxOdometer km)")
+                dao.insert(cloudRecord.copy(id = 0, vehiclePlate = cleanPlate))
+                return@withContext true
+            }
+        }
+        return@withContext false
+    }
 }

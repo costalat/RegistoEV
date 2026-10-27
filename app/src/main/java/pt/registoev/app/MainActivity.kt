@@ -186,6 +186,12 @@ class MainActivity : ComponentActivity() {
                         if ((availableTabs.getOrNull(pagerState.currentPage) != AppTab.NEW) && !pagerState.isScrollInProgress) {
                             editingRecord = null
                         }
+                        // Sincronização inteligente: consultar Google Sheets ao selecionar a tab Novo Registo
+                        if (availableTabs.getOrNull(pagerState.currentPage) == AppTab.NEW) {
+                            scope.launch(Dispatchers.IO) {
+                                CloudSyncManager.syncLatestRecordIfNeeded(dao, activePlate)
+                            }
+                        }
                         // Auto-scroll da barra de navegação para manter o item visível
                         if (navScrollState.maxValue > 0) {
                             val maxIndex = (availableTabs.size - 1).coerceAtLeast(1)
@@ -358,7 +364,13 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         )
-                                        AppTab.SETTINGS -> SettingsScreen()
+                                        AppTab.SETTINGS -> SettingsScreen(
+                                            onPlateActivated = { activatedPlate ->
+                                                lifecycleScope.launch(Dispatchers.IO) {
+                                                    CloudSyncManager.syncLatestRecordIfNeeded(dao, activatedPlate)
+                                                }
+                                            }
+                                        )
                                         AppTab.ABOUT -> AboutScreen()
                                         null -> {}
                                     }

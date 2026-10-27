@@ -103,7 +103,9 @@ object VehicleManager {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onPlateActivated: ((String) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("registoev_prefs", Context.MODE_PRIVATE) }
 
@@ -295,6 +297,7 @@ fun SettingsScreen() {
                             .clickable {
                                 activePlate = v.plate
                                 VehicleManager.setActiveVehicle(sharedPrefs, v.plate)
+                                onPlateActivated?.invoke(v.plate)
                             },
                         colors = CardDefaults.cardColors(
                             containerColor = if (isActive) Color(0xFF2C2C2E) else Color(0xFF141416)

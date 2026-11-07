@@ -37,6 +37,12 @@ import pt.registoev.app.data.EvChargeEntity
 import java.text.SimpleDateFormat
 import java.util.*
 
+fun parseDecimalValue(text: String): Double {
+    val sanitized = text.trim().replace(',', '.')
+    val parsed = sanitized.toDoubleOrNull() ?: 0.0
+    return Math.round(parsed * 100.0) / 100.0
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AddChargeScreen(
@@ -131,8 +137,8 @@ fun AddChargeScreen(
             }
             3 -> { // Passo Final: Guardar Efetivamente
                 val odoVal = odometer.toIntOrNull() ?: 0
-                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else (kwh.text.toDoubleOrNull() ?: 0.0)
-                val litersVal = if (chargeType == "Combustível") (liters.text.toDoubleOrNull() ?: 0.0) else null
+                val kwhVal = if (chargeType == "Nenhum" || chargeType == "Combustível") 0.0 else parseDecimalValue(kwh.text)
+                val litersVal = if (chargeType == "Combustível") parseDecimalValue(liters.text) else null
                 
                 // Se for combustível, passamos o local manual
                 val manualLoc = if (chargeType == "Combustível") fuelLocation else null
@@ -491,7 +497,10 @@ fun AddChargeScreen(
                                     Text("Energia", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
                                     Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
                                         BasicTextField(
-                                            value = kwh, onValueChange = { kwh = it }, 
+                                            value = kwh, onValueChange = { newValue ->
+                                                val updatedText = newValue.text.replace(',', '.')
+                                                kwh = newValue.copy(text = updatedText)
+                                            }, 
                                             modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) kwh = kwh.copy(selection = TextRange(0, kwh.text.length)) },
                                             textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50)),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFF4CAF50)), singleLine = true,
@@ -516,7 +525,10 @@ fun AddChargeScreen(
                                     Text("Quantidade", style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
                                     Box(modifier = Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
                                         BasicTextField(
-                                            value = liters, onValueChange = { liters = it }, 
+                                            value = liters, onValueChange = { newValue ->
+                                                val updatedText = newValue.text.replace(',', '.')
+                                                liters = newValue.copy(text = updatedText)
+                                            }, 
                                             modifier = Modifier.fillMaxWidth().focusRequester(kwhFocusRequester).onFocusChanged { if(it.isFocused) liters = liters.copy(selection = TextRange(0, liters.text.length)) },
                                             textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.End, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300)),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), cursorBrush = SolidColor(Color(0xFFFFB300)), singleLine = true,

@@ -58,7 +58,9 @@ object VehicleManager {
             }
         }
         val defaultList = getDefaultFromPrefs(prefs)
-        saveVehicles(prefs, defaultList)
+        if (defaultList.any { it.plate.isNotBlank() }) {
+            saveVehicles(prefs, defaultList)
+        }
         return defaultList
     }
 
@@ -71,6 +73,7 @@ object VehicleManager {
     }
 
     fun saveVehicles(prefs: SharedPreferences, list: List<VehicleProfile>) {
+        if (list.isEmpty()) return
         val json = gson.toJson(list)
         prefs.edit { putString("vehicles_json", json) }
     }
@@ -83,8 +86,10 @@ object VehicleManager {
         }
         if (active.isNotBlank()) return active
         val vehicles = getVehicles(prefs)
-        val firstPlate = vehicles.firstOrNull()?.plate ?: ""
-        setActiveVehicle(prefs, firstPlate)
+        val firstPlate = vehicles.firstOrNull { it.plate.isNotBlank() }?.plate ?: ""
+        if (firstPlate.isNotBlank()) {
+            setActiveVehicle(prefs, firstPlate)
+        }
         return firstPlate
     }
 

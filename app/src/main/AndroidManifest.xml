@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
      android:label="Registo Auto"
+     android:allowBackup="true"
+     android:restoreAnyVersion="true"
      android:theme="@style/Theme.RegistoEV.Splash"
      android:icon="@mipmap/ic_launcher">
   <activity android:name=".SplashActivity"

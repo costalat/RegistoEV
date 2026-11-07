@@ -79,11 +79,35 @@ class MainActivity : ComponentActivity() {
 
         var isUpdatingData by mutableStateOf(value = false)
 
-        // Migração automática de registos antigos para a matrícula ativa
+        // Rotina de Salvaguarda e Recuperação de Definições (Veículos / Matrículas)
         lifecycleScope.launch(Dispatchers.IO) {
             val prefs = getSharedPreferences("registoev_prefs", MODE_PRIVATE)
             val primaryPlate = VehicleManager.getActivePlate(prefs)
-            dao.migrateEmptyPlatesTo(primaryPlate)
+            
+            // Se a matrícula ativa estiver vazia, tentar recuperar a partir do histórico Room
+            if (primaryPlate.isBlank()) {
+                val allCharges = dao.allList()
+                val detectedPlates = allCharges.map { it.vehiclePlate.trim().uppercase() }
+                    .filter { it.isNotBlank() && it != "00-AA-00" }
+                    .distinct()
+                
+                if (detectedPlates.isNotEmpty()) {
+                    val restoredPlate = detectedPlates.first()
+                    android.util.Log.d("RegistoEV", "Recuperada matrícula do histórico Room: $restoredPlate")
+                    
+                    val existingVehicles = VehicleManager.getVehicles(prefs).toMutableList()
+                    detectedPlates.forEach { plate ->
+                        if (existingVehicles.none { it.plate.equals(plate, ignoreCase = true) }) {
+                            existingVehicles.add(VehicleProfile(plate = plate, brand = "", model = ""))
+                        }
+                    }
+                    VehicleManager.saveVehicles(prefs, existingVehicles)
+                    VehicleManager.setActiveVehicle(prefs, restoredPlate)
+                    dao.migrateEmptyPlatesTo(restoredPlate)
+                }
+            } else {
+                dao.migrateEmptyPlatesTo(primaryPlate)
+            }
         }
 
         // Lógica de Sincronização Inicial V1.7.1 (Mapa em Memória)

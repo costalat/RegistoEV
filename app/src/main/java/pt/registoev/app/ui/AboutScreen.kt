@@ -114,10 +114,9 @@ fun AboutScreen() {
                 
                 val features = listOf(
                     "Registo de movimentos e quilometragem",
-                    "Cálculo automático de kWh/100km",
-                    "Gráficos de consumo e energia",
-                    "Backup e restauro de dados",
-                    "Exportação de relatórios mensais em PDF"
+                    "Registo de carregamentos (kWh) e abastecimentos (litros)",
+                    "Consulta de histórico por viatura",
+                    "Sincronização automática na núvem",
                 )
                 
                 features.forEachIndexed { index, feature ->
@@ -164,7 +163,6 @@ fun AboutScreen() {
                 ChangelogItem("Nuvem", "Sincronização automática e edição com Google Sheets.")
                 ChangelogItem("Combustível", "Novo suporte para litros e local de abastecimento.")
                 ChangelogItem("Interface", "Novo design premium, ícones 3D e navegação fluida.")
-                ChangelogItem("Relatórios", "PDFs melhorados com proteção de colunas.")
             }
         }
 
